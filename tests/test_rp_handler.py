@@ -140,13 +140,14 @@ class TestRunpodWorkerComfy(unittest.TestCase):
 
         self.assertEqual(result["status"], "success")
 
-    @patch("rp_handler.os.path.exists")
-    @patch("rp_handler.rp_upload.upload_image")
+    @patch("src.rp_handler.os.path.exists")
+    @patch("src.rp_handler.rp_upload.upload_image")
     @patch.dict(
         os.environ,
         {
             "COMFY_OUTPUT_PATH": RUNPOD_WORKER_COMFY_TEST_RESOURCES_IMAGES,
             "BUCKET_ENDPOINT_URL": "http://example.com",
+            "IMAGE_RETURN_METHOD": "s3",
         },
     )
     def test_bucket_endpoint_configured(self, mock_upload_image, mock_exists):
@@ -168,6 +169,75 @@ class TestRunpodWorkerComfy(unittest.TestCase):
         self.assertEqual(result["message"], "http://example.com/uploaded/image.png")
         mock_upload_image.assert_called_once_with(
             job_id, "./test_resources/images/test/ComfyUI_00001_.png"
+        )
+        
+    @patch("src.rp_handler.os.path.exists")
+    @patch("src.rp_handler.upload_to_azure_blob")
+    @patch.dict(
+        os.environ,
+        {
+            "COMFY_OUTPUT_PATH": RUNPOD_WORKER_COMFY_TEST_RESOURCES_IMAGES,
+            "AZURE_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=https;AccountName=mystorageaccount;AccountKey=accountkey;EndpointSuffix=core.windows.net",
+            "IMAGE_RETURN_METHOD": "azure",
+        },
+    )
+    def test_azure_blob_storage_configured(self, mock_upload_to_azure, mock_exists):
+        # Mock the os.path.exists to return True, simulating that the image exists
+        mock_exists.return_value = True
+
+        # Mock the upload_to_azure_blob to return a simulated URL
+        mock_upload_to_azure.return_value = "https://mystorageaccount.blob.core.windows.net/comfyui-images/123/ComfyUI_00001_.png"
+
+        # Define the outputs and job_id for the test
+        outputs = {"node_id": {"images": [{"filename": "ComfyUI_00001_.png", "subfolder": "test"}]}}
+        job_id = "123"
+
+        # Call the function under test
+        result = rp_handler.process_output_images(outputs, job_id)
+
+        # Assertions
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["message"], "https://mystorageaccount.blob.core.windows.net/comfyui-images/123/ComfyUI_00001_.png")
+        mock_upload_to_azure.assert_called_once_with(
+            job_id, "./test_resources/images/test/ComfyUI_00001_.png"
+        )
+        
+    @patch("src.rp_handler.os.path.exists")
+    @patch("src.rp_handler.upload_to_azure_blob")
+    @patch("src.rp_handler.base64_encode")
+    @patch.dict(
+        os.environ,
+        {
+            "COMFY_OUTPUT_PATH": RUNPOD_WORKER_COMFY_TEST_RESOURCES_IMAGES,
+            "AZURE_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=https;AccountName=mystorageaccount;AccountKey=accountkey;EndpointSuffix=core.windows.net",
+            "IMAGE_RETURN_METHOD": "azure",
+        },
+    )
+    def test_azure_blob_storage_upload_fails(self, mock_base64_encode, mock_upload_to_azure, mock_exists):
+        # Mock the os.path.exists to return True, simulating that the image exists
+        mock_exists.return_value = True
+
+        # Mock the upload_to_azure_blob to return None, simulating a failure
+        mock_upload_to_azure.return_value = None
+        
+        # Mock the base64_encode to return a simulated base64 string
+        mock_base64_encode.return_value = "base64encodedstring"
+
+        # Define the outputs and job_id for the test
+        outputs = {"node_id": {"images": [{"filename": "ComfyUI_00001_.png", "subfolder": "test"}]}}
+        job_id = "123"
+
+        # Call the function under test
+        result = rp_handler.process_output_images(outputs, job_id)
+
+        # Assertions
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["message"], "base64encodedstring")
+        mock_upload_to_azure.assert_called_once_with(
+            job_id, "./test_resources/images/test/ComfyUI_00001_.png"
+        )
+        mock_base64_encode.assert_called_once_with(
+            "./test_resources/images/test/ComfyUI_00001_.png"
         )
 
     @patch("rp_handler.os.path.exists")
@@ -232,3 +302,94 @@ class TestRunpodWorkerComfy(unittest.TestCase):
 
         self.assertEqual(len(responses), 3)
         self.assertEqual(responses["status"], "error")
+        
+    @patch("src.rp_handler.os.path.exists")
+    @patch("src.rp_handler.base64_encode")
+    @patch.dict(
+        os.environ,
+        {
+            "COMFY_OUTPUT_PATH": RUNPOD_WORKER_COMFY_TEST_RESOURCES_IMAGES,
+            "IMAGE_RETURN_METHOD": "base64",
+        },
+    )
+    def test_default_base64_method(self, mock_base64_encode, mock_exists):
+        # Mock the os.path.exists to return True, simulating that the image exists
+        mock_exists.return_value = True
+        
+        # Mock the base64_encode to return a simulated base64 string
+        mock_base64_encode.return_value = "base64encodedstring"
+        
+        # Define the outputs and job_id for the test
+        outputs = {"node_id": {"images": [{"filename": "ComfyUI_00001_.png", "subfolder": "test"}]}}
+        job_id = "123"
+        
+        # Call the function under test
+        result = rp_handler.process_output_images(outputs, job_id)
+        
+        # Assertions
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["message"], mock_base64_encode.return_value)
+        mock_base64_encode.assert_called_once_with(
+            "./test_resources/images/test/ComfyUI_00001_.png"
+        )
+
+    @patch("src.rp_handler.os.path.exists")
+    @patch("src.rp_handler.base64_encode")
+    @patch.dict(
+        os.environ,
+        {
+            "COMFY_OUTPUT_PATH": RUNPOD_WORKER_COMFY_TEST_RESOURCES_IMAGES,
+            "IMAGE_RETURN_METHOD": "azure",
+        },
+    )
+    def test_cloud_storage_requested_but_not_configured(self, mock_base64_encode, mock_exists):
+        # Mock the os.path.exists to return True, simulating that the image exists
+        mock_exists.return_value = True
+        
+        # Mock the base64_encode to return a simulated base64 string
+        mock_base64_encode.return_value = "base64encodedstring"
+        
+        # Define the outputs and job_id for the test
+        outputs = {"node_id": {"images": [{"filename": "ComfyUI_00001_.png", "subfolder": "test"}]}}
+        job_id = "123"
+        
+        # Call the function under test
+        result = rp_handler.process_output_images(outputs, job_id)
+        
+        # Assertions
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["message"], "base64encodedstring")
+        mock_base64_encode.assert_called_once_with(
+            "./test_resources/images/test/ComfyUI_00001_.png"
+        )
+
+    @patch("builtins.open", new_callable=mock_open, read_data=b"test_image_data")
+    @patch("rp_handler.BlobServiceClient.from_connection_string")
+    @patch.dict(
+        os.environ,
+        {
+            "AZURE_STORAGE_CONNECTION_STRING": "DefaultEndpointsProtocol=https;AccountName=mystorageaccount;AccountKey=accountkey;EndpointSuffix=core.windows.net",
+        },
+    )
+    def test_upload_to_azure_blob(self, mock_blob_service_client, mock_file):
+        # Setup mocks for the Azure blob storage
+        mock_container_client = MagicMock()
+        mock_container_client.exists.return_value = True
+        
+        mock_blob_client = MagicMock()
+        mock_blob_client.url = "https://mystorageaccount.blob.core.windows.net/comfyui-images/job123/image.png"
+        
+        mock_blob_service = MagicMock()
+        mock_blob_service.get_container_client.return_value = mock_container_client
+        mock_blob_service.get_blob_client.return_value = mock_blob_client
+        
+        mock_blob_service_client.return_value = mock_blob_service
+
+        # Run the function
+        result = rp_handler.upload_to_azure_blob("job123", "/path/to/image.png")
+        
+        # Assertions
+        self.assertEqual(result, "https://mystorageaccount.blob.core.windows.net/comfyui-images/job123/image.png")
+        mock_blob_service.get_container_client.assert_called_once()
+        mock_blob_service.get_blob_client.assert_called_once()
+        mock_blob_client.upload_blob.assert_called_once()

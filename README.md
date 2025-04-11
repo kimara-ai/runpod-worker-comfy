@@ -18,6 +18,7 @@
 - [Features](#features)
 - [Config](#config)
   * [Upload image to AWS S3](#upload-image-to-aws-s3)
+  * [Upload image to Azure Blob Storage](#upload-image-to-azure-blob-storage)
 - [Use the Docker image on RunPod](#use-the-docker-image-on-runpod)
   * [Create your template (optional)](#create-your-template-optional)
   * [Create your endpoint](#create-your-endpoint)
@@ -69,6 +70,7 @@
 - The generated image is either:
   - Returned as base64-encoded string (default)
   - Uploaded to AWS S3 ([if AWS S3 is configured](#upload-image-to-aws-s3))
+  - Uploaded to Azure Blob Storage ([if Azure Blob Storage is configured](#upload-image-to-azure-blob-storage))
 - There are a few different Docker images to choose from:
   - `timpietruskyblibla/runpod-worker-comfy:3.6.0-flux1-schnell`: contains the [flux1-schnell.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-schnell) checkpoint, the [clip_l.safetensors](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors) + [t5xxl_fp8_e4m3fn.safetensors](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors) text encoders and [ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors) VAE for FLUX.1-schnell
   - `timpietruskyblibla/runpod-worker-comfy:3.6.0-flux1-dev`: contains the [flux1-dev.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev) checkpoint, the [clip_l.safetensors](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors) + [t5xxl_fp8_e4m3fn.safetensors](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors) text encoders and [ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors) VAE for FLUX.1-dev
@@ -89,6 +91,7 @@
 | `COMFY_POLLING_INTERVAL_MS` | Time to wait between poll attempts in milliseconds.                                                                                                                                   | `250`    |
 | `COMFY_POLLING_MAX_RETRIES` | Maximum number of poll attempts. This should be increased the longer your workflow is running.                                                                                        | `500`    |
 | `SERVE_API_LOCALLY`         | Enable local API server for development and testing. See [Local Testing](#local-testing) for more details.                                                                            | disabled |
+| `IMAGE_RETURN_METHOD`       | Determines the preferred method to return the generated image. Possible values: `azure`, `s3`, or `base64`. If the preferred method fails or is not configured, it will fall back to another method. | `base64` |
 
 ### Upload image to AWS S3
 
@@ -104,6 +107,20 @@ This is only needed if you want to upload the generated picture to AWS S3. If yo
 | `BUCKET_ENDPOINT_URL`      | The endpoint URL of your S3 bucket.                     | `https://<bucket>.s3.<region>.amazonaws.com` |
 | `BUCKET_ACCESS_KEY_ID`     | Your AWS access key ID for accessing the S3 bucket.     | `AKIAIOSFODNN7EXAMPLE`                       |
 | `BUCKET_SECRET_ACCESS_KEY` | Your AWS secret access key for accessing the S3 bucket. | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY`   |
+
+### Upload image to Azure Blob Storage
+
+This is only needed if you want to upload the generated picture to Azure Blob Storage. If you don't configure this, your image will be exported as base64-encoded string or uploaded to AWS S3 if that's configured.
+
+- Create an Azure Storage Account in your Azure Portal
+- Create a Storage Container (or use the default container name `comfyui-images`)
+- Get the Connection String for your Storage Account
+- Configure these environment variables for your RunPod worker:
+
+| Environment Variable               | Description                                                 | Example                                                                                           |
+| ---------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `AZURE_STORAGE_CONNECTION_STRING`  | The connection string for your Azure Storage Account.       | `DefaultEndpointsProtocol=https;AccountName=mystorageaccount;AccountKey=accountkey;EndpointSuffix=core.windows.net` |
+| `AZURE_STORAGE_CONTAINER_NAME`     | The name of the container in your Azure Storage Account.    | `comfyui-images` (default if not specified)                                                        |
 
 ## Use the Docker image on RunPod
 
@@ -232,6 +249,21 @@ Example response with AWS S3 bucket configuration
   "id": "sync-c0cd1eb2-068f-4ecf-a99a-55770fc77391-e1",
   "output": {
     "message": "https://bucket.s3.region.amazonaws.com/10-23/sync-c0cd1eb2-068f-4ecf-a99a-55770fc77391-e1/c67ad621.png",
+    "status": "success"
+  },
+  "status": "COMPLETED"
+}
+```
+
+Example response with Azure Blob Storage configuration
+
+```json
+{
+  "delayTime": 2321,
+  "executionTime": 2405,
+  "id": "sync-a5bd7e29-136f-4cdf-8c3a-55770fc77391-e1",
+  "output": {
+    "message": "https://mystorageaccount.blob.core.windows.net/comfyui-images/sync-a5bd7e29-136f-4cdf-8c3a-55770fc77391-e1/ComfyUI_00001_.png",
     "status": "success"
   },
   "status": "COMPLETED"

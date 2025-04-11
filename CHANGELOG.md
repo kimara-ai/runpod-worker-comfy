@@ -1,3 +1,10 @@
+# [Unreleased]
+
+### Features
+
+* add support for Azure Blob Storage image uploads
+* add `IMAGE_RETURN_METHOD` environment variable to control the preferred image output method (azure, s3, or base64)
+
 # [3.6.0](https://github.com/blib-la/runpod-worker-comfy/compare/3.5.0...3.6.0) (2025-03-12)
 
 

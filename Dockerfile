@@ -32,8 +32,8 @@ RUN /usr/bin/yes | comfy --workspace /comfyui install --cuda-version 11.8 --nvid
 # Change working directory to ComfyUI
 WORKDIR /comfyui
 
-# Install runpod
-RUN pip install runpod requests
+# Install runpod and Azure storage dependencies
+RUN pip install runpod requests azure-storage-blob azure-identity
 
 # Support for the network volume
 ADD src/extra_model_paths.yaml ./
