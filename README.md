@@ -112,15 +112,25 @@ This is only needed if you want to upload the generated picture to AWS S3. If yo
 
 This is only needed if you want to upload the generated picture to Azure Blob Storage. If you don't configure this, your image will be exported as base64-encoded string or uploaded to AWS S3 if that's configured.
 
-- Create an Azure Storage Account in your Azure Portal
-- Create a Storage Container (or use the default container name `comfyui-images`)
-- Get the Connection String for your Storage Account
-- Configure these environment variables for your RunPod worker:
+1. Create an Azure Storage Account and get its connection string
+2. Configure these environment variables for your RunPod worker:
 
 | Environment Variable               | Description                                                 | Example                                                                                           |
 | ---------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `AZURE_STORAGE_CONNECTION_STRING`  | The connection string for your Azure Storage Account.       | `DefaultEndpointsProtocol=https;AccountName=mystorageaccount;AccountKey=accountkey;EndpointSuffix=core.windows.net` |
 | `AZURE_STORAGE_CONTAINER_NAME`     | The name of the container in your Azure Storage Account.    | `comfyui-images` (default if not specified)                                                        |
+| `IMAGE_RETURN_METHOD`              | Set to `azure` to prioritize Azure Blob Storage for uploads | `azure`                                                                                            |
+
+Example response with Azure Blob Storage:
+```json
+{
+  "output": {
+    "message": "https://mystorageaccount.blob.core.windows.net/comfyui-images/job-id/ComfyUI_00001_.png",
+    "status": "success"
+  },
+  "status": "COMPLETED"
+}
+```
 
 ## Use the Docker image on RunPod
 
