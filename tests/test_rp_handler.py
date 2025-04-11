@@ -7,6 +7,14 @@ import base64
 
 # Make sure that "src" is known and can be used to import rp_handler.py
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+
+# Mock the runpod module as it's not needed for tests
+sys.modules['runpod'] = MagicMock()
+sys.modules['runpod.serverless.utils'] = MagicMock()
+sys.modules['runpod.serverless.utils.rp_upload'] = MagicMock()
+sys.modules['azure.storage.blob'] = MagicMock()
+sys.modules['azure.identity'] = MagicMock()
+
 from src import rp_handler
 
 # Local folder for test resources
@@ -123,13 +131,13 @@ class TestRunpodWorkerComfy(unittest.TestCase):
         self.assertEqual(result, test_data)
 
     @patch("rp_handler.os.path.exists")
-    @patch("rp_handler.rp_upload.upload_image")
+    @patch("rp_handler.base64_encode")
     @patch.dict(
         os.environ, {"COMFY_OUTPUT_PATH": RUNPOD_WORKER_COMFY_TEST_RESOURCES_IMAGES}
     )
-    def test_bucket_endpoint_not_configured(self, mock_upload_image, mock_exists):
+    def test_bucket_endpoint_not_configured(self, mock_base64_encode, mock_exists):
         mock_exists.return_value = True
-        mock_upload_image.return_value = "simulated_uploaded/image.png"
+        mock_base64_encode.return_value = "base64_encoded_image_data"
 
         outputs = {
             "node_id": {"images": [{"filename": "ComfyUI_00001_.png", "subfolder": ""}]}
@@ -139,9 +147,14 @@ class TestRunpodWorkerComfy(unittest.TestCase):
         result = rp_handler.process_output_images(outputs, job_id)
 
         self.assertEqual(result["status"], "success")
+        self.assertIsInstance(result["message"], list)
+        self.assertEqual(len(result["message"]), 1)
+        self.assertEqual(result["message"][0]["node_id"], "node_id")
+        self.assertEqual(result["message"][0]["imageType"], "base64")
+        self.assertEqual(result["message"][0]["image"], "base64_encoded_image_data")
 
-    @patch("src.rp_handler.os.path.exists")
-    @patch("src.rp_handler.rp_upload.upload_image")
+    @patch("rp_handler.os.path.exists")
+    @patch("rp_handler.rp_upload.upload_image")
     @patch.dict(
         os.environ,
         {
@@ -166,13 +179,17 @@ class TestRunpodWorkerComfy(unittest.TestCase):
 
         # Assertions
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["message"], "http://example.com/uploaded/image.png")
+        self.assertIsInstance(result["message"], list)
+        self.assertEqual(len(result["message"]), 1)
+        self.assertEqual(result["message"][0]["node_id"], "node_id")
+        self.assertEqual(result["message"][0]["imageType"], "url")
+        self.assertEqual(result["message"][0]["image"], "http://example.com/uploaded/image.png")
         mock_upload_image.assert_called_once_with(
             job_id, "./test_resources/images/test/ComfyUI_00001_.png"
         )
         
-    @patch("src.rp_handler.os.path.exists")
-    @patch("src.rp_handler.upload_to_azure_blob")
+    @patch("rp_handler.os.path.exists")
+    @patch("rp_handler.upload_to_azure_blob")
     @patch.dict(
         os.environ,
         {
@@ -197,14 +214,18 @@ class TestRunpodWorkerComfy(unittest.TestCase):
 
         # Assertions
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["message"], "https://mystorageaccount.blob.core.windows.net/comfyui-images/123/ComfyUI_00001_.png")
+        self.assertIsInstance(result["message"], list)
+        self.assertEqual(len(result["message"]), 1)
+        self.assertEqual(result["message"][0]["node_id"], "node_id")
+        self.assertEqual(result["message"][0]["imageType"], "url")
+        self.assertEqual(result["message"][0]["image"], "https://mystorageaccount.blob.core.windows.net/comfyui-images/123/ComfyUI_00001_.png")
         mock_upload_to_azure.assert_called_once_with(
             job_id, "./test_resources/images/test/ComfyUI_00001_.png"
         )
         
-    @patch("src.rp_handler.os.path.exists")
-    @patch("src.rp_handler.upload_to_azure_blob")
-    @patch("src.rp_handler.base64_encode")
+    @patch("rp_handler.os.path.exists")
+    @patch("rp_handler.upload_to_azure_blob")
+    @patch("rp_handler.base64_encode")
     @patch.dict(
         os.environ,
         {
@@ -232,7 +253,11 @@ class TestRunpodWorkerComfy(unittest.TestCase):
 
         # Assertions
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["message"], "base64encodedstring")
+        self.assertIsInstance(result["message"], list)
+        self.assertEqual(len(result["message"]), 1)
+        self.assertEqual(result["message"][0]["node_id"], "node_id")
+        self.assertEqual(result["message"][0]["imageType"], "base64")
+        self.assertEqual(result["message"][0]["image"], "base64encodedstring")
         mock_upload_to_azure.assert_called_once_with(
             job_id, "./test_resources/images/test/ComfyUI_00001_.png"
         )
@@ -267,9 +292,13 @@ class TestRunpodWorkerComfy(unittest.TestCase):
 
         result = rp_handler.process_output_images(outputs, job_id)
 
-        # Check if the image was saved to the 'simulated_uploaded' directory
-        self.assertIn("simulated_uploaded", result["message"])
+        # Assertions for the new format
         self.assertEqual(result["status"], "success")
+        self.assertIsInstance(result["message"], list)
+        self.assertEqual(len(result["message"]), 1)
+        self.assertEqual(result["message"][0]["node_id"], "node_id")
+        self.assertEqual(result["message"][0]["imageType"], "url")
+        self.assertIn("simulated_uploaded", result["message"][0]["image"])
 
     @patch("rp_handler.requests.post")
     def test_upload_images_successful(self, mock_post):
@@ -303,8 +332,8 @@ class TestRunpodWorkerComfy(unittest.TestCase):
         self.assertEqual(len(responses), 3)
         self.assertEqual(responses["status"], "error")
         
-    @patch("src.rp_handler.os.path.exists")
-    @patch("src.rp_handler.base64_encode")
+    @patch("rp_handler.os.path.exists")
+    @patch("rp_handler.base64_encode")
     @patch.dict(
         os.environ,
         {
@@ -328,13 +357,17 @@ class TestRunpodWorkerComfy(unittest.TestCase):
         
         # Assertions
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["message"], mock_base64_encode.return_value)
+        self.assertIsInstance(result["message"], list)
+        self.assertEqual(len(result["message"]), 1)
+        self.assertEqual(result["message"][0]["node_id"], "node_id")
+        self.assertEqual(result["message"][0]["imageType"], "base64")
+        self.assertEqual(result["message"][0]["image"], "base64encodedstring")
         mock_base64_encode.assert_called_once_with(
             "./test_resources/images/test/ComfyUI_00001_.png"
         )
 
-    @patch("src.rp_handler.os.path.exists")
-    @patch("src.rp_handler.base64_encode")
+    @patch("rp_handler.os.path.exists")
+    @patch("rp_handler.base64_encode")
     @patch.dict(
         os.environ,
         {
@@ -358,7 +391,11 @@ class TestRunpodWorkerComfy(unittest.TestCase):
         
         # Assertions
         self.assertEqual(result["status"], "success")
-        self.assertEqual(result["message"], "base64encodedstring")
+        self.assertIsInstance(result["message"], list)
+        self.assertEqual(len(result["message"]), 1)
+        self.assertEqual(result["message"][0]["node_id"], "node_id")
+        self.assertEqual(result["message"][0]["imageType"], "base64")
+        self.assertEqual(result["message"][0]["image"], "base64encodedstring")
         mock_base64_encode.assert_called_once_with(
             "./test_resources/images/test/ComfyUI_00001_.png"
         )
