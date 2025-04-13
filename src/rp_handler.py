@@ -7,7 +7,10 @@ import time
 import os
 import requests
 import base64
+import uuid
 from io import BytesIO
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.identity import DefaultAzureCredential
 
 # Time to wait between API check attempts in milliseconds
 COMFY_API_AVAILABLE_INTERVAL_MS = 50
@@ -200,12 +203,58 @@ def base64_encode(img_path):
         return f"{encoded_string}"
 
 
+def upload_to_azure_blob(job_id, local_image_path):
+    """
+    Uploads an image to Azure Blob Storage and returns the URL.
+
+    Args:
+        job_id (str): The unique identifier for the job.
+        local_image_path (str): The path to the local image file.
+
+    Returns:
+        str: URL to the uploaded image in Azure Blob Storage.
+    """
+    try:
+        # Get connection details from environment variables
+        connection_string = os.environ.get("AZURE_STORAGE_CONNECTION_STRING")
+        container_name = os.environ.get("AZURE_STORAGE_CONTAINER_NAME", "comfyui-images")
+        
+        # Create a unique name for the blob using job_id and file name
+        file_name = os.path.basename(local_image_path)
+        blob_name = f"{job_id}/{file_name}"
+
+        # Create the BlobServiceClient object
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        
+        # Get container client and create container if it doesn't exist
+        container_client = blob_service_client.get_container_client(container_name)
+        if not container_client.exists():
+            container_client.create_container()
+        
+        # Create a blob client
+        blob_client = blob_service_client.get_blob_client(
+            container=container_name, 
+            blob=blob_name
+        )
+        
+        # Upload the file
+        with open(local_image_path, "rb") as data:
+            blob_client.upload_blob(data, overwrite=True)
+        
+        # Return the URL to the blob
+        return blob_client.url
+    
+    except Exception as e:
+        print(f"Error uploading to Azure Blob Storage: {str(e)}")
+        # Return None to indicate failure
+        return None
+
 def process_output_images(outputs, job_id):
     """
     This function takes the "outputs" from image generation and the job ID,
-    then determines the correct way to return the image, either as a direct URL
-    to an AWS S3 bucket or as a base64 encoded string, depending on the
-    environment configuration.
+    then determines the correct way to return the images, either as direct URLs
+    to an AWS S3 bucket, Azure Blob Storage, or as base64 encoded strings, 
+    depending on the environment configuration.
 
     Args:
         outputs (dict): A dictionary containing the outputs from image generation,
@@ -214,68 +263,111 @@ def process_output_images(outputs, job_id):
 
     Returns:
         dict: A dictionary with the status ('success' or 'error') and the message,
-              which is either the URL to the image in the AWS S3 bucket or a base64
-              encoded string of the image. In case of error, the message details the issue.
+              which is a list of dictionaries containing node_id, imageType ('url' or 'base64'),
+              and the image data. In case of error, the message contains an error description.
 
     The function works as follows:
     - It first determines the output path for the images from an environment variable,
       defaulting to "/comfyui/output" if not set.
     - It then iterates through the outputs to find the filenames of the generated images.
-    - After confirming the existence of the image in the output folder, it checks if the
-      AWS S3 bucket is configured via the BUCKET_ENDPOINT_URL environment variable.
-    - If AWS S3 is configured, it uploads the image to the bucket and returns the URL.
-    - If AWS S3 is not configured, it encodes the image in base64 and returns the string.
-    - If the image file does not exist in the output folder, it returns an error status
-      with a message indicating the missing image file.
+    - For each image found, it checks if it exists in the output folder.
+    - If the image exists, it checks if cloud storage is configured.
+    - If Azure Blob Storage is preferred and configured, it uploads the image to Azure and adds the URL to the results.
+    - If AWS S3 is configured, it uploads the image to the bucket and adds the URL to the results.
+    - If no cloud storage is configured, it encodes the image in base64 and adds the string to the results.
+    - If any image file does not exist in the output folder, it adds an error for that specific image.
+    - Returns a list of all processed images with their node_id and image data.
     """
 
     # The path where ComfyUI stores the generated images
     COMFY_OUTPUT_PATH = os.environ.get("COMFY_OUTPUT_PATH", "/comfyui/output")
-
-    output_images = {}
-
-    for node_id, node_output in outputs.items():
-        if "images" in node_output:
-            for image in node_output["images"]:
-                output_images = os.path.join(image["subfolder"], image["filename"])
+    
+    # List to collect all image results
+    image_results = []
+    errors = []
 
     print(f"runpod-worker-comfy - image generation is done")
 
-    # expected image output folder
-    local_image_path = f"{COMFY_OUTPUT_PATH}/{output_images}"
+    # Process each node and its images
+    for node_id, node_output in outputs.items():
+        if "images" in node_output:
+            for image in node_output["images"]:
+                # Construct the image path
+                image_path = os.path.join(image["subfolder"], image["filename"])
+                local_image_path = f"{COMFY_OUTPUT_PATH}/{image_path}"
+                
+                print(f"runpod-worker-comfy - processing: {local_image_path}")
+                
+                # Check if the image file exists
+                if os.path.exists(local_image_path):
+                    # Get the preferred image return method from environment variable
+                    # Possible values: "azure", "s3", "base64" (default)
+                    image_return_method = os.environ.get("IMAGE_RETURN_METHOD", "base64").lower()
+                    
+                    if image_return_method == "azure" and os.environ.get("AZURE_STORAGE_CONNECTION_STRING"):
+                        # Upload to Azure Blob Storage
+                        image_data = upload_to_azure_blob(job_id, local_image_path)
+                        if image_data:
+                            image_type = "url"
+                            print(f"runpod-worker-comfy - image from node {node_id} uploaded to Azure Blob Storage")
+                        else:
+                            # Fallback if Azure upload fails
+                            if os.environ.get("BUCKET_ENDPOINT_URL", False):
+                                image_data = rp_upload.upload_image(job_id, local_image_path)
+                                image_type = "url"
+                                print(f"runpod-worker-comfy - Azure upload failed, image from node {node_id} falling back to AWS S3")
+                            else:
+                                image_data = base64_encode(local_image_path)
+                                image_type = "base64"
+                                print(f"runpod-worker-comfy - Azure upload failed, image from node {node_id} falling back to base64")
+                    elif image_return_method == "s3" and os.environ.get("BUCKET_ENDPOINT_URL", False):
+                        # Upload to AWS S3
+                        image_data = rp_upload.upload_image(job_id, local_image_path)
+                        image_type = "url"
+                        print(f"runpod-worker-comfy - image from node {node_id} uploaded to AWS S3")
+                    elif image_return_method in ["azure", "s3"]:
+                        # User requested cloud storage but it's not configured, fall back to base64
+                        image_data = base64_encode(local_image_path)
+                        image_type = "base64"
+                        print(f"runpod-worker-comfy - {image_return_method} was requested but not configured, image from node {node_id} falling back to base64")
+                    else:
+                        # Use base64 (default)
+                        image_data = base64_encode(local_image_path)
+                        image_type = "base64"
+                        print(f"runpod-worker-comfy - image from node {node_id} converted to base64")
+                    
+                    # Add this image to our results
+                    image_results.append({
+                        "node_id": node_id,
+                        "imageType": image_type,
+                        "image": image_data
+                    })
+                else:
+                    error_msg = f"Image does not exist in the specified output folder: {local_image_path}"
+                    print(f"runpod-worker-comfy - {error_msg}")
+                    errors.append({
+                        "node_id": node_id,
+                        "error": error_msg
+                    })
 
-    print(f"runpod-worker-comfy - {local_image_path}")
-
-    # The image is in the output folder
-    if os.path.exists(local_image_path):
-        if os.environ.get("BUCKET_ENDPOINT_URL", False):
-            # URL to image in AWS S3
-            image = rp_upload.upload_image(job_id, local_image_path)
-            print(
-                "runpod-worker-comfy - the image was generated and uploaded to AWS S3"
-            )
-        else:
-            # base64 image
-            image = base64_encode(local_image_path)
-            print(
-                "runpod-worker-comfy - the image was generated and converted to base64"
-            )
-
+    # Return the results
+    if image_results:
         return {
             "status": "success",
-            "message": image,
+            "message": image_results,  # Keep the "message" field for backward compatibility
+            "errors": errors if errors else []
         }
     else:
-        print("runpod-worker-comfy - the image does not exist in the output folder")
         return {
             "status": "error",
-            "message": f"the image does not exist in the specified output folder: {local_image_path}",
+            "message": "No images were successfully generated or found",
+            "errors": errors
         }
 
 
 def handler(job):
     """
-    The main function that handles a job of generating an image.
+    The main function that handles a job of generating images.
 
     This function validates the input, sends a prompt to ComfyUI for processing,
     polls ComfyUI for result, and retrieves generated images.
@@ -284,7 +376,9 @@ def handler(job):
         job (dict): A dictionary containing job details and input parameters.
 
     Returns:
-        dict: A dictionary containing either an error message or a success status with generated images.
+        dict: A dictionary containing either an error message or a success status with a message field
+              that contains a list of generated images. Each image is represented as a dictionary with 
+              node_id, imageType, and image data (either URL or base64).
     """
     job_input = job["input"]
 
@@ -337,9 +431,10 @@ def handler(job):
     except Exception as e:
         return {"error": f"Error waiting for image generation: {str(e)}"}
 
-    # Get the generated image and return it as URL in an AWS bucket or as base64
+    # Get the generated images and return them as URLs in an AWS bucket or as base64
     images_result = process_output_images(history[prompt_id].get("outputs"), job["id"])
 
+    # Add refresh_worker flag to the result
     result = {**images_result, "refresh_worker": REFRESH_WORKER}
 
     return result
