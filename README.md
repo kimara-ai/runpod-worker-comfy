@@ -10,7 +10,7 @@
 
 [![Discord](https://img.shields.io/discord/1275179185790386331?color=7289da&label=Discord&logo=discord&logoColor=fff&style=for-the-badge)](https://discord.com/invite/BBDPRQzGSM)
 
-This project is a fork of blib-la/runpod-worker-comfy.
+This project was originally forked from blib-la/runpod-worker-comfy but is now independently maintained.
 
 ---
 
@@ -508,7 +508,7 @@ And also make sure to add these **variables** to your repository:
 
 ## Acknowledgments
 
-- This project was forked from [blib-la/runpod-worker-comfy](https://github.com/blib-la/runpod-worker-comfy)
+- This project was originally forked from [blib-la/runpod-worker-comfy](https://github.com/blib-la/runpod-worker-comfy) but is now independently maintained.
 - Thanks to [Justin Merrell](https://github.com/justinmerrell) from RunPod for [worker-1111](https://github.com/runpod-workers/worker-a1111)
 - Thanks to [Ashley Kleynhans](https://github.com/ashleykleynhans) for [runpod-worker-a1111](https://github.com/ashleykleynhans/runpod-worker-a1111)
 - Thanks to [comfyanonymous](https://github.com/comfyanonymous) for creating [ComfyUI](https://github.com/comfyanonymous/ComfyUI)

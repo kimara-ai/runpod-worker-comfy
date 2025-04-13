@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## 1.0.0 (2025-04-13)
 
-Initial release after hard fork from blib-la/runpod-worker-comfy.
+Initial release as an independent project.
 
 ### Features
 - Azure Blob Storage support
@@ -12,5 +12,5 @@ Initial release after hard fork from blib-la/runpod-worker-comfy.
 - Environment variable to control image output method (azure, s3, or base64)
 
 ### Notes
-This project was forked from [blib-la/runpod-worker-comfy](https://github.com/blib-la/runpod-worker-comfy). 
+This project was originally forked from [blib-la/runpod-worker-comfy](https://github.com/blib-la/runpod-worker-comfy) but is now independently maintained.
 The version numbering has been reset to 1.0.0 to reflect the new project history.

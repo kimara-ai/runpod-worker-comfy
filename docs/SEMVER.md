@@ -53,9 +53,9 @@ This project uses [semantic-release](https://github.com/semantic-release/semanti
 3. **Docker Image Versioning**
 
    The project builds multiple Docker images with tags reflecting the semantic version:
-   - `timpietruskyblibla/runpod-worker-comfy:<version>-base`
-   - `timpietruskyblibla/runpod-worker-comfy:<version>-sdxl`
-   - `timpietruskyblibla/runpod-worker-comfy:<version>-sd3`
+   - `kimaraai/runpod-worker-comfy:<version>-base`
+   - `kimaraai/runpod-worker-comfy:<version>-sdxl`
+   - `kimaraai/runpod-worker-comfy:<version>-sd3`
 
 ## Development Workflow
 

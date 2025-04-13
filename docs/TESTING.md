@@ -15,7 +15,7 @@ This guide explains how to build, run, and test the locally developed version of
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/blib-la/runpod-worker-comfy.git
+git clone https://github.com/kimara-ai/runpod-worker-comfy.git
 cd runpod-worker-comfy
 ```
 
