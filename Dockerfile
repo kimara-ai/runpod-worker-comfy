@@ -1,5 +1,5 @@
 # Stage 1: Base image with common dependencies
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 as base
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04 AS base
 
 # Prevents prompts from packages asking for user input during installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -55,7 +55,7 @@ RUN /restore_snapshot.sh
 CMD ["/start.sh"]
 
 # Stage 2: Download models
-FROM base as downloader
+FROM base AS downloader
 
 ARG HUGGINGFACE_ACCESS_TOKEN
 ARG MODEL_TYPE
@@ -86,10 +86,12 @@ RUN if [ "$MODEL_TYPE" = "sdxl" ]; then \
     fi
 
 # Stage 3: Final image
-FROM base as final
+FROM base AS final
 
 # Copy models from stage 2 to the final image
 COPY --from=downloader /comfyui/models /comfyui/models
+
+ADD comfyui-config/ /
 
 # Start container
 CMD ["/start.sh"]

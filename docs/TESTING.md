@@ -1,14 +1,16 @@
-# Running RunPod Worker ComfyUI Locally for Testing
+# Running and Testing RunPod Worker ComfyUI Locally
 
-This guide explains how to run and test the RunPod Worker ComfyUI Docker image on your local machine.
+This guide explains how to build, run, and test the locally developed version of RunPod Worker ComfyUI on your local machine.
 
 ## Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) installed on your system
+- [Docker Compose](https://docs.docker.com/compose/install/) installed
 - NVIDIA GPU with CUDA support
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed (for GPU access from Docker)
+- Git (to clone the repository)
 
-## Setup Process
+## Building and Testing Local Changes
 
 ### 1. Clone the Repository
 
@@ -17,33 +19,130 @@ git clone https://github.com/blib-la/runpod-worker-comfy.git
 cd runpod-worker-comfy
 ```
 
-### 2. Start with Docker Compose
+### 2. Build the Docker Image Locally
 
-The easiest way to run the worker locally is using Docker Compose:
+You can build different versions of the image depending on your needs:
 
 ```bash
-docker-compose up
+# Build the base image (no models)
+docker build -t local/runpod-worker-comfy:dev-base --target base --platform linux/amd64 .
+
+# Build the SDXL image
+docker build --build-arg MODEL_TYPE=sdxl -t local/runpod-worker-comfy:dev-sdxl --platform linux/amd64 .
+
+# Build the SD3 image (requires Hugging Face token)
+docker build --build-arg MODEL_TYPE=sd3 --build-arg HUGGINGFACE_ACCESS_TOKEN=your-token -t local/runpod-worker-comfy:dev-sd3 --platform linux/amd64 .
+
+# Build FLUX.1 schnell image
+docker build --build-arg MODEL_TYPE=flux1-schnell -t local/runpod-worker-comfy:dev-flux1-schnell --platform linux/amd64 .
+
+# Build FLUX.1 dev image (requires Hugging Face token)
+docker build --build-arg MODEL_TYPE=flux1-dev --build-arg HUGGINGFACE_ACCESS_TOKEN=your-token -t local/runpod-worker-comfy:dev-flux1-dev --platform linux/amd64 .
+```
+
+> **Note**: Always specify `--platform linux/amd64` to ensure compatibility with RunPod.
+
+### 3. Create a Local Docker Compose File
+
+Create a file named `docker-compose-local.yml` with your locally built image:
+
+```yaml
+services:
+  comfyui-worker:
+    image: local/runpod-worker-comfy:dev-sdxl  # Use your locally built image
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - SERVE_API_LOCALLY=true
+      - COMFY_POLLING_INTERVAL_MS=250
+      - COMFY_POLLING_MAX_RETRIES=500
+    ports:
+      - "8000:8000"
+      - "8188:8188"
+    volumes:
+      - ./test_data/output:/comfyui/output       # Test-specific output path
+      - ./test_data/volume:/runpod-volume        # Test-specific volume path
+      - ./src:/src_local                         # Mount source code for easier development
+```
+
+### 4. Create Required Directories
+
+```bash
+mkdir -p test_data/output
+mkdir -p test_data/volume
+```
+
+### 5. Run the Local Docker Image
+
+```bash
+docker-compose -f docker-compose-local.yml up
 ```
 
 This will:
-- Pull the SDXL image version (`timpietruskyblibla/runpod-worker-comfy:3.4.0-sdxl`)
-- Mount local directories for output files and volume data
+- Start your locally built image
 - Enable the local API server (`SERVE_API_LOCALLY=true`)
 - Configure NVIDIA GPU support
+- Mount local directories for output files and volume data
 - Expose ports:
   - 8000: Worker API
   - 8188: ComfyUI interface
 
-### 3. Accessing the Services
+### 6. Accessing the Services
 
 Once running, you can access:
 
 - **Local Worker API**: http://localhost:8000
 - **ComfyUI Interface**: http://localhost:8188
 
-## Testing the Handler
+### 7. Testing the API
 
-If you want to test the RunPod handler directly without Docker, you can use a virtual environment:
+Test your local API with the included test workflow:
+
+```bash
+# Check the API health endpoint
+curl http://localhost:8000/health
+
+# Run a test with the included workflow
+curl -X POST -H "Content-Type: application/json" -d @test_input.json http://localhost:8000/run
+```
+
+## Alternative: Using Docker Buildx
+
+For more advanced multi-platform builds, you can use Docker Buildx:
+
+```bash
+# Build all targets
+docker buildx bake --set *.platform=linux/amd64 --set *.output=type=docker
+
+# Build specific targets
+docker buildx bake --set *.platform=linux/amd64 --set *.output=type=docker sdxl
+
+# Tag with custom repository
+DOCKERHUB_REPO=local RELEASE_VERSION=dev docker buildx bake --set *.platform=linux/amd64 --set *.output=type=docker sdxl
+```
+
+### Preventing Docker.io Prefixing
+
+If you want to prevent Docker from adding the `docker.io/` prefix to your image name, you can use:
+
+```bash
+# Disable BuildKit
+DOCKER_BUILDKIT=0 docker build -t local/runpod-worker-comfy:dev-sdxl --build-arg MODEL_TYPE=sdxl --platform linux/amd64 .
+
+# Or use --no-resolve flag
+docker build --no-resolve -t local/runpod-worker-comfy:dev-sdxl --build-arg MODEL_TYPE=sdxl --platform linux/amd64 .
+```
+
+This is purely cosmetic - the images will work the same regardless of the prefix.
+
+## Python Testing Without Docker
+
+If you want to test the Python code directly without Docker:
 
 ### 1. Create and Activate Virtual Environment
 
@@ -79,57 +178,20 @@ To start the handler server directly:
 python src/rp_handler.py
 ```
 
-**Note**: For this to work, you also need ComfyUI running, otherwise the handler will not function correctly.
+**Note**: For this to work without Docker, you need ComfyUI running separately, otherwise the handler will not function correctly.
+
+## Testing with Azure Blob Storage
+
+To test with Azure Blob Storage, follow the steps in the [Setting Up SDXL with Azure Blob Storage](#setting-up-sdxl-with-azure-blob-storage) section of this document.
 
 ## Setting Up SDXL with Azure Blob Storage
 
-Here's a complete step-by-step guide to set up a local SDXL endpoint with Azure Blob Storage:
+To test with Azure Blob Storage configuration, create a `docker-compose-azure-local.yml` file:
 
-### 1. Create Azure Storage Account and Container
-
-```bash
-# Install Azure CLI if needed
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-
-# Login to Azure
-az login
-
-# Create a resource group (skip if you have one already)
-az group create --name comfyui-test-group --location eastus
-
-# Create a storage account
-az storage account create \
-  --name comfyuitest \
-  --resource-group comfyui-test-group \
-  --location eastus \
-  --sku Standard_LRS \
-  --kind StorageV2
-
-# Get the connection string
-AZURE_STORAGE_CONNECTION_STRING=$(az storage account show-connection-string \
-  --name comfyuitest \
-  --resource-group comfyui-test-group \
-  --query connectionString \
-  --output tsv)
-
-# Create a container
-az storage container create \
-  --name comfyui-images \
-  --connection-string "$AZURE_STORAGE_CONNECTION_STRING"
-
-echo "Azure Storage Connection String: $AZURE_STORAGE_CONNECTION_STRING"
-echo "Azure Storage Container Name: comfyui-images"
-```
-
-### 2. Create a Custom Docker Compose File
-
-Create a file named `docker-compose-azure.yml` with the following content:
-
-```bash
-cat > docker-compose-azure.yml << 'EOF'
+```yaml
 services:
   comfyui-worker:
-    image: timpietruskyblibla/runpod-worker-comfy:3.6.0-sdxl
+    image: local/runpod-worker-comfy:dev-sdxl  # Your locally built image
     deploy:
       resources:
         reservations:
@@ -141,186 +203,63 @@ services:
       - SERVE_API_LOCALLY=true
       - IMAGE_RETURN_METHOD=azure
       - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
-      - AZURE_STORAGE_CONTAINER_NAME=comfyui-images
+      - AZURE_STORAGE_CONTAINER_NAME=comfyui-test-images
       - COMFY_POLLING_INTERVAL_MS=250
       - COMFY_POLLING_MAX_RETRIES=500
     ports:
       - "8000:8000"
       - "8188:8188"
     volumes:
-      - ./data/comfyui/output:/comfyui/output
-      - ./data/runpod-volume:/runpod-volume
-EOF
+      - ./test_data/output:/comfyui/output
+      - ./test_data/volume:/runpod-volume
+      - ./src:/src_local
 ```
 
-### 3. Create Required Directories
+To run the container with Azure Blob Storage configuration:
 
-```bash
-mkdir -p data/comfyui/output
-mkdir -p data/runpod-volume
-```
+1. Generate an Azure Storage connection string from the Azure Portal:
+   - Go to your Storage Account
+   - Navigate to "Security + networking" → "Access keys" 
+   - Copy one of the connection strings
 
-### 4. Start the Container with Azure Configuration
+2. Export the connection string as an environment variable:
+   ```bash
+   export AZURE_STORAGE_CONNECTION_STRING="DefaultEndpointsProtocol=https;AccountName=yourstorageaccount;AccountKey=yourkey;EndpointSuffix=core.windows.net"
+   ```
 
-```bash
-# Start with Azure environment variables
-export AZURE_STORAGE_CONNECTION_STRING="$AZURE_STORAGE_CONNECTION_STRING"
-docker-compose -f docker-compose-azure.yml up
-```
+3. Start the container with the Azure-specific compose file:
+   ```bash
+   docker compose -f docker-compose-azure-local.yml up
+   ```
 
-### 5. Verify the Setup
+4. Test with the sample workflow:
+   ```bash
+   curl -X POST -H "Content-Type: application/json" -d @test_input.json http://localhost:8000/run
+   ```
 
-In a new terminal window:
+The response should include an Azure Blob Storage URL for the generated image.
 
-```bash
-# Check if container is running
-docker ps
+For step-by-step Azure setup instructions, see the [Azure Blob Storage Setup](#setting-up-sdxl-with-azure-blob-storage) section in this document.
 
-# Test the API health endpoint
-curl http://localhost:8000/health
+## Development Workflow Tips
 
-# Run a test with SDXL workflow
-curl -X POST -H "Content-Type: application/json" -d @test_input.json http://localhost:8000/run
-```
+1. **Making Changes**:
+   - Edit source files in the `src/` directory
+   - Rebuild the Docker image with your changes
+   - Test using the methods above
 
-### 6. Testing with a Custom SDXL Workflow
+2. **Adding Custom Models**:
+   - Add download commands in the Dockerfile
+   - Rebuild the image with the appropriate model type
 
-Create a test workflow using the SDXL model:
+3. **Adding Custom Nodes**:
+   - Export a snapshot from ComfyUI Manager
+   - Save the `*_snapshot.json` file in the project root directory
+   - Rebuild the image - the snapshot will be automatically restored
 
-```bash
-cat > sdxl_test_workflow.json << 'EOF'
-{
-  "input": {
-    "workflow": {
-      "3": {
-        "inputs": {
-          "seed": 1337,
-          "steps": 20,
-          "cfg": 8,
-          "sampler_name": "euler",
-          "scheduler": "normal",
-          "denoise": 1,
-          "model": ["4", 0],
-          "positive": ["6", 0],
-          "negative": ["7", 0],
-          "latent_image": ["5", 0]
-        },
-        "class_type": "KSampler"
-      },
-      "4": {
-        "inputs": {
-          "ckpt_name": "sd_xl_base_1.0.safetensors"
-        },
-        "class_type": "CheckpointLoaderSimple"
-      },
-      "5": {
-        "inputs": {
-          "width": 1024,
-          "height": 1024,
-          "batch_size": 1
-        },
-        "class_type": "EmptyLatentImage"
-      },
-      "6": {
-        "inputs": {
-          "text": "beautiful mountain landscape with a lake, photorealistic, 8k, detailed",
-          "clip": ["4", 1]
-        },
-        "class_type": "CLIPTextEncode"
-      },
-      "7": {
-        "inputs": {
-          "text": "text, watermark, blurry, low quality",
-          "clip": ["4", 1]
-        },
-        "class_type": "CLIPTextEncode"
-      },
-      "8": {
-        "inputs": {
-          "samples": ["3", 0],
-          "vae": ["4", 2]
-        },
-        "class_type": "VAEDecode"
-      },
-      "9": {
-        "inputs": {
-          "filename_prefix": "ComfyUI",
-          "images": ["8", 0]
-        },
-        "class_type": "SaveImage"
-      }
-    }
-  }
-}
-EOF
-
-# Test with the SDXL workflow
-curl -X POST -H "Content-Type: application/json" -d @sdxl_test_workflow.json http://localhost:8000/run
-```
-
-### 7. Check the Generated Image in Azure Blob Storage
-
-```bash
-# List the blobs in the container
-az storage blob list \
-  --container-name comfyui-images \
-  --connection-string "$AZURE_STORAGE_CONNECTION_STRING" \
-  --output table
-
-# Generate a URL to access the latest image
-LATEST_BLOB=$(az storage blob list \
-  --container-name comfyui-images \
-  --connection-string "$AZURE_STORAGE_CONNECTION_STRING" \
-  --query "[0].name" \
-  --output tsv)
-
-az storage blob url \
-  --container-name comfyui-images \
-  --name "$LATEST_BLOB" \
-  --connection-string "$AZURE_STORAGE_CONNECTION_STRING" \
-  --output tsv
-```
-
-### 8. Shut Down the Container
-
-When you're done testing:
-
-```bash
-# Stop the Docker Compose services
-docker-compose -f docker-compose-azure.yml down
-
-# Clean up images if needed
-docker system prune -f
-```
-
-### 9. Optional: Clean Up Azure Resources
-
-```bash
-# Delete the Azure storage account when you're done with testing
-az storage account delete \
-  --name comfyuitest \
-  --resource-group comfyui-test-group \
-  --yes
-
-# Delete the resource group if you created one just for this test
-az group delete \
-  --name comfyui-test-group \
-  --yes
-```
-
-## Testing with Sample Workflows
-
-The repository includes sample workflows in the `test_resources/workflows/` directory that you can use for testing.
-
-You can make API requests to your local worker using the sample `test_input.json` file:
-
-```bash
-curl -X POST -H "Content-Type: application/json" -d @test_input.json http://localhost:8000/run
-```
-
-## Windows-Specific Setup
-
-For Windows users, WSL2 with Ubuntu is recommended. Follow the detailed setup instructions in the [README.md](../README.md#setup-for-windows) document.
+4. **Platform Considerations**:
+   - Always use `--platform linux/amd64` for Docker builds
+   - For Windows, follow the [Setup for Windows](#setup-for-windows) instructions in the main README
 
 ## Troubleshooting
 
@@ -328,16 +267,8 @@ For Windows users, WSL2 with Ubuntu is recommended. Follow the detailed setup in
 - **Container Exits Immediately**: Check Docker logs for error messages
 - **API Not Reachable**: Verify that ports 8000 and 8188 are not in use by other applications
 - **Azure Blob Storage Issues**: Check the connection string and container existence
+- **Build Errors**: Ensure Docker has enough resources (CPU, memory) allocated
 
-## Environment Variables
+## Windows-Specific Setup
 
-You can customize the worker behavior using environment variables in `docker-compose.yml`:
-
-| Environment Variable              | Description                                        | Example Value                                                                                     |
-| --------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `COMFY_POLLING_INTERVAL_MS`       | Time between poll attempts in milliseconds         | `250`                                                                                             |
-| `COMFY_POLLING_MAX_RETRIES`       | Maximum number of poll attempts                    | `500`                                                                                             |
-| `SERVE_API_LOCALLY`               | Enable local API server for development and testing| `true`                                                                                            |
-| `IMAGE_RETURN_METHOD`             | How to return generated images (azure, s3, base64) | `azure`                                                                                           |
-| `AZURE_STORAGE_CONNECTION_STRING` | Azure Storage Account connection string            | `DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net`   |
-| `AZURE_STORAGE_CONTAINER_NAME`    | Azure Storage container name                       | `comfyui-images`                                                                                  |
+For Windows users, WSL2 with Ubuntu is recommended. Follow the detailed setup instructions in the [README.md](../README.md#setup-for-windows) document.
