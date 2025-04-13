@@ -245,7 +245,7 @@ def upload_to_azure_blob(job_id, local_image_path):
         return blob_client.url
     
     except Exception as e:
-        print(f"Error uploading to Azure Blob Storage: {str(e)}")
+        print(f"runpod-worker-comfy - Error uploading to Azure Blob Storage: {str(e)}")
         # Return None to indicate failure
         return None
 
