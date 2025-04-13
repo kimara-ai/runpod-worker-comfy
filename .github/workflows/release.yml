@@ -58,7 +58,7 @@ jobs:
           additional-packages: |
             ['@semantic-release/git', '@semantic-release/changelog', '@semantic-release/exec']
         env:
-          GITHUB_TOKEN: ${{ secrets.BLIBLA_SEMANTIC_RELEASE }}
+          GITHUB_TOKEN: ${{ secrets.KIMARA_SEMANTIC_RELEASE }}
 
       - name: Set environment variables
         if: steps.semanticrelease.outputs.new-release-published == 'true'
