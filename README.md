@@ -3,7 +3,7 @@
 > [ComfyUI](https://github.com/comfyanonymous/ComfyUI) as a serverless API on [RunPod](https://www.runpod.io/)
 
 <p align="center">
-  <img src="assets/worker_sitting_in_comfy_chair.jpg" title="Worker sitting in comfy chair" />
+  <img src="assets/worker_sitting_in_comfy_chair.png" title="Worker sitting in comfy chair" />
 </p>
 
 [Support the maintenance of this image by registering to runpod through this link!](https://runpod.io?ref=hoognf1a)
