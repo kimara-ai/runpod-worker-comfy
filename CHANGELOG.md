@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.0...1.0.1) (2025-04-14)
+
+
+### Bug Fixes
+
+* add Huggingface Actions secret checking ([525eeb8](https://github.com/kimara-ai/runpod-worker-comfy/commit/525eeb86b0afc2516a7bc89e86ddd4fd38cac599))
+
 # 1.0.0 (2025-04-14)
 
 
