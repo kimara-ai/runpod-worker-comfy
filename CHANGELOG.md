@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.1...1.0.2) (2025-04-14)
+
+
+### Bug Fixes
+
+* change comfy manager config ([cc16069](https://github.com/kimara-ai/runpod-worker-comfy/commit/cc16069c3d6f021d99883aa374225550fef86a4d))
+
 ## [1.0.1](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.0...1.0.1) (2025-04-14)
 
 
