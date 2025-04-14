@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.3...1.0.4) (2025-04-14)
+
+
+### Bug Fixes
+
+* remove sdxl build/release flavors, completely rework docs ([48e5dfc](https://github.com/kimara-ai/runpod-worker-comfy/commit/48e5dfca749257ab0508e67ab68aa056cba41fc4))
+
 ## [1.0.3](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.2...1.0.3) (2025-04-14)
 
 
