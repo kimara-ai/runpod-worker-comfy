@@ -1,86 +1,84 @@
 # Semantic Versioning (SemVer) Guidelines for RunPod Worker ComfyUI
 
-This document describes how semantic versioning is implemented in the RunPod Worker ComfyUI project, including conventions, processes, and tools used.
+This document outlines the semantic versioning implementation in the RunPod Worker ComfyUI project, including conventions, processes, and automation tools.
 
 ## Semantic Versioning Overview
 
-[Semantic Versioning](https://semver.org/) (SemVer) is a versioning scheme that uses a three-part version number: `MAJOR.MINOR.PATCH`, where:
+[SemVer](https://semver.org/) uses three-part numbering: `MAJOR.MINOR.PATCH`:
 
-- **MAJOR** version increases when you make incompatible API changes
-- **MINOR** version increases when you add functionality in a backward compatible manner
-- **PATCH** version increases when you make backward compatible bug fixes
+- **MAJOR**: Incompatible API changes
+- **MINOR**: New backward-compatible features
+- **PATCH**: Bug fixes
 
-## Current Implementation
+## Implementation Details
 
-This project uses [semantic-release](https://github.com/semantic-release/semantic-release) to automate version management and package publishing. The implementation is visible in the `.releaserc` file at the root of the project.
+This project leverages [semantic-release](https://github.com/semantic-release/semantic-release) to automate versioning and package publishing. Configuration is defined in the `.releaserc` file at the project root.
 
 ### Key Components
 
-1. **Commit Message Format**
+#### 1. Commit Message Format
 
-   The project follows the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
 
-   ```
-   <type>[optional scope]: <description>
+```
+<type>[optional scope]: <description>
 
-   [optional body]
+[optional body]
 
-   [optional footer(s)]
-   ```
+[optional footer(s)]
+```
 
-   Common types include:
-   - `feat`: A new feature (triggers MINOR version bump)
-   - `fix`: A bug fix (triggers PATCH version bump)
-   - `docs`: Documentation changes
-   - `style`: Changes that don't affect code functionality
-   - `refactor`: Code changes that neither fix bugs nor add features
-   - `test`: Adding or correcting tests
-   - `chore`: Routine tasks, maintenance
+**Common Types**:
+- `feat`: New feature (triggers MINOR version bump)
+- `fix`: Bug fix (triggers PATCH version bump)
+- `docs`: Documentation changes
+- `style`: Formatting changes (no code change)
+- `refactor`: Code restructuring (no functional change)
+- `test`: Test additions or corrections
+- `chore`: Maintenance tasks
 
-   Breaking changes (triggering MAJOR version bump) are indicated by:
-   - Adding `BREAKING CHANGE:` in the commit footer, or
-   - Appending a `!` after the type/scope (e.g., `feat!:`)
+**Breaking Changes** (trigger MAJOR version bump):
+- Add `BREAKING CHANGE:` in footer or
+- Append `!` after type/scope (e.g., `feat!:`)
 
-2. **Release Configuration**
+#### 2. Release Automation
 
-   The `.releaserc` file configures the semantic-release behavior:
-   - Automatic version determination based on commit messages
-   - Changelog generation
-   - Updating versions in documentation
-   - Creating git tags
-   - Publishing GitHub releases
+The semantic-release configuration handles:
+- Version calculation based on commit history
+- CHANGELOG generation
+- Documentation version updates
+- Git tag creation
+- GitHub release publishing
 
-3. **Docker Image Versioning**
+#### 3. Docker Image Versioning
 
-   The project builds multiple Docker images with tags reflecting the semantic version:
-   - `kimaraai/runpod-worker-comfy:<version>-base`
-   - `kimaraai/runpod-worker-comfy:<version>-sdxl`
+Images are tagged according to semantic version:
+- `kimaraai/runpod-worker-comfy:<version>-base`
+
+Note: Model-specific images (SDXL, etc.) must be built manually due to GitHub Actions disk space limitations.
 
 ## Development Workflow
 
-### Making Changes
+### Contributing Changes
 
-1. Create a feature or fix branch from `main`
-2. Make your changes
-3. Commit using the Conventional Commits format
-4. Push your branch and create a pull request
-5. After review and approval, merge to `main`
+1. Branch from `main` for your feature/fix
+2. Implement your changes
+3. Create commits following Conventional Commits format
+4. Submit a pull request
+5. After approval and merge to `main`, automation takes over
 
-### Automatic Release Process
+### Automated Release Process
 
-When changes are merged to `main`:
+When changes merge to `main`:
 
-1. The semantic-release GitHub Action runs
-2. It analyzes commit messages since the last release
-3. It determines the new version number
-4. It updates the CHANGELOG.md
-5. It updates version references in README.md
-6. It creates a git tag and GitHub release
-7. Docker images are built with the new version tag
+1. semantic-release GitHub Action triggers
+2. Commit analysis determines version increment
+3. CHANGELOG.md updates with new entries
+4. README.md version references update
+5. Git tag and GitHub release are created
+6. Docker image builds with the new version tag
 
-## Examples
-
-### Commit Messages Examples
+## Commit Message Examples
 
 ```
 # Patch release (0.0.x)
@@ -93,7 +91,7 @@ feat: add support for Azure Blob Storage
 feat!: restructure API response format
 ```
 
-or:
+Or with footer for breaking changes:
 
 ```
 feat: completely redesign workflow structure
@@ -101,21 +99,20 @@ feat: completely redesign workflow structure
 BREAKING CHANGE: The workflow JSON format has changed significantly
 ```
 
-### Version Progression Examples
+## Version Progression Examples
 
-- Current version: `3.4.0`
-- After merging bug fix: `3.4.1`
-- After adding a new feature: `3.5.0`
-- After introducing a breaking change: `4.0.0`
+Starting with version `3.4.0`:
+- Bug fix → `3.4.1`
+- New feature → `3.5.0`
+- Breaking change → `4.0.0`
 
 ## Troubleshooting
 
-If semantic-release is not working as expected:
+When release automation fails:
 
-1. Check that commit messages follow the correct format
-2. Verify GitHub Action workflows are properly configured
-3. Examine semantic-release logs in GitHub Actions for specific errors
-4. Ensure you have the required permissions to create tags and releases
+- Check commit message format
+- Review Action workflow logs
+- Verify tag creation permissions
 
 ## Additional Resources
 

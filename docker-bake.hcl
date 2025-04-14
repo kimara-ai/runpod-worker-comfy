@@ -15,7 +15,7 @@ variable "HUGGINGFACE_ACCESS_TOKEN" {
 }
 
 group "default" {
-  targets = ["base", "sdxl"]
+  targets = ["base"]
 }
 
 target "base" {
@@ -26,6 +26,8 @@ target "base" {
   tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-base"]
 }
 
+# SDXL target is excluded from default builds due to GitHub Actions disk space constraints
+# To build manually: docker buildx bake sdxl
 target "sdxl" {
   context = "."
   dockerfile = "Dockerfile"
