@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.2...1.0.3) (2025-04-14)
+
+
+### Bug Fixes
+
+* unbloat by removing model options ([a3245e5](https://github.com/kimara-ai/runpod-worker-comfy/commit/a3245e53fdc0b8761f5458969c875f864bb826b3))
+
 ## [1.0.2](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.1...1.0.2) (2025-04-14)
 
 
