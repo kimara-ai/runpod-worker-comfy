@@ -30,14 +30,6 @@ docker build -t local/runpod-worker-comfy:dev-base --target base --platform linu
 # Build the SDXL image
 docker build --build-arg MODEL_TYPE=sdxl -t local/runpod-worker-comfy:dev-sdxl --platform linux/amd64 .
 
-# Build the SD3 image (requires Hugging Face token)
-docker build --build-arg MODEL_TYPE=sd3 --build-arg HUGGINGFACE_ACCESS_TOKEN=your-token -t local/runpod-worker-comfy:dev-sd3 --platform linux/amd64 .
-
-# Build FLUX.1 schnell image
-docker build --build-arg MODEL_TYPE=flux1-schnell -t local/runpod-worker-comfy:dev-flux1-schnell --platform linux/amd64 .
-
-# Build FLUX.1 dev image (requires Hugging Face token)
-docker build --build-arg MODEL_TYPE=flux1-dev --build-arg HUGGINGFACE_ACCESS_TOKEN=your-token -t local/runpod-worker-comfy:dev-flux1-dev --platform linux/amd64 .
 ```
 
 > **Note**: Always specify `--platform linux/amd64` to ensure compatibility with RunPod.

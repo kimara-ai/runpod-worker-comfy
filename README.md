@@ -70,14 +70,11 @@ This project was originally forked from blib-la/runpod-worker-comfy but is now i
   - Uploaded to AWS S3 ([if AWS S3 is configured](#upload-image-to-aws-s3))
   - Uploaded to Azure Blob Storage ([if Azure Blob Storage is configured](#upload-image-to-azure-blob-storage))
 - There are a few different Docker images to choose from:
-  - `kimaraai/runpod-worker-comfy:1.0.3-flux1-schnell`: contains the [flux1-schnell.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-schnell) checkpoint, the [clip_l.safetensors](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors) + [t5xxl_fp8_e4m3fn.safetensors](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors) text encoders and [ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors) VAE for FLUX.1-schnell
-  - `kimaraai/runpod-worker-comfy:1.0.3-flux1-dev`: contains the [flux1-dev.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev) checkpoint, the [clip_l.safetensors](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors) + [t5xxl_fp8_e4m3fn.safetensors](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors) text encoders and [ae.safetensors](https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors) VAE for FLUX.1-dev
-  - `kimaraai/runpod-worker-comfy:1.0.3-sdxl`: contains the checkpoints and VAE for Stable Diffusion XL
+  - `kimaraai/runpod-worker-comfy:1.0.2-sdxl`: contains the checkpoints and VAE for Stable Diffusion XL
     - Checkpoint: [sd_xl_base_1.0.safetensors](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
     - VAEs:
       - [sdxl_vae.safetensors](https://huggingface.co/stabilityai/sdxl-vae/)
       - [sdxl-vae-fp16-fix](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/)
-  - `kimaraai/runpod-worker-comfy:1.0.3-sd3`: contains the [sd3_medium_incl_clips_t5xxlfp8.safetensors](https://huggingface.co/stabilityai/stable-diffusion-3-medium) checkpoint for Stable Diffusion 3 medium
 - [Bring your own models](#bring-your-own-models)
 - Based on [Ubuntu + NVIDIA CUDA](https://hub.docker.com/r/nvidia/cuda)
 
@@ -138,7 +135,7 @@ Example response with Azure Blob Storage:
 - In the dialog, configure:
   - Template Name: `runpod-worker-comfy` (it can be anything you want)
   - Template Type: serverless (change template type to "serverless")
-  - Container Image: `<dockerhub_username>/<repository_name>:tag`, in this case: `kimaraai/runpod-worker-comfy:1.0.3-sd3` (or `-base` for a clean image or `-sdxl` for Stable Diffusion XL or `-flex1-schnell` for FLUX.1 schnell)
+  - Container Image: `<dockerhub_username>/<repository_name>:tag`, in this case: `kimaraai/runpod-worker-comfy:1.0.2-sdxl` (or `-base` for a clean image without models)
   - Container Registry Credentials: You can leave everything as it is, as this repo is public
   - Container Disk: `20 GB`
   - (optional) Environment Variables: [Configure S3](#upload-image-to-aws-s3)
@@ -165,12 +162,9 @@ Example response with Azure Blob Storage:
 
 ### GPU recommendations
 
-| Model                     | Image           | Minimum VRAM Required | Container Size |
-| ------------------------- | --------------- | --------------------- | -------------- |
-| Stable Diffusion XL       | `sdxl`          | 8 GB                  | 15 GB          |
-| Stable Diffusion 3 Medium | `sd3`           | 5 GB                  | 20 GB          |
-| FLUX.1 Schnell            | `flux1-schnell` | 24 GB                 | 30 GB          |
-| FLUX.1 dev                | `flux1-dev`     | 24 GB                 | 30 GB          |
+| Model               | Image    | Minimum VRAM Required | Container Size |
+| ------------------- | -------- | --------------------- | -------------- |
+| Stable Diffusion XL | `sdxl`   | 8 GB                  | 15 GB          |
 
 ## API specification
 
@@ -376,8 +370,6 @@ docker build -t <your_dockerhub_username>/runpod-worker-comfy:dev-base --target 
 # Build the SDXL image
 docker build --build-arg MODEL_TYPE=sdxl -t <your_dockerhub_username>/runpod-worker-comfy:dev-sdxl --platform linux/amd64 .
 
-# Build the SD3 image
-docker build --build-arg MODEL_TYPE=sd3 --build-arg HUGGINGFACE_ACCESS_TOKEN=<your-huggingface-token> -t <your_dockerhub_username>/runpod-worker-comfy:dev-sd3 --platform linux/amd64 .
 ```
 
 > [!NOTE]  
