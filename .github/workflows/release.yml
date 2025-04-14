@@ -81,8 +81,11 @@ jobs:
 
       - name: Update description on Docker Hub
         if: steps.semanticrelease.outputs.new-release-published == 'true'
-        uses: peter-evans/dockerhub-description@v3
+        uses: peter-evans/dockerhub-description@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: ${{ env.DOCKERHUB_REPO }}/${{ env.DOCKERHUB_IMG }}
+          short-description: ${{ github.event.repository.description }}
+          readme-filepath: ./README.md
+          enable-url-completion: true
