@@ -21,6 +21,7 @@ group "default" {
 target "base" {
   context = "."
   dockerfile = "Dockerfile"
+  target = "final"
   platforms = ["linux/amd64"]
   tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-base"]
 }
@@ -30,6 +31,7 @@ target "base" {
 target "sdxl" {
   context = "."
   dockerfile = "Dockerfile"
+  target = "final"
   args = {
     MODEL_TYPE = "sdxl"
   }
