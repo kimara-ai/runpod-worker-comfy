@@ -18,10 +18,18 @@ group "default" {
   targets = ["base"]
 }
 
+group "slim" {
+  targets = ["base-slim"]
+}
+
+group "slim-sdxl" {
+  targets = ["sdxl-slim"]
+}
+
 target "base" {
   context = "."
   dockerfile = "Dockerfile"
-  target = "base"
+  target = "final"
   platforms = ["linux/amd64"]
   tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-base"]
 }
@@ -36,7 +44,29 @@ target "sdxl" {
     MODEL_TYPE = "sdxl"
   }
   tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-sdxl"]
-  inherits = ["base"]
+}
+
+# Slim target for creating optimized images using DockerSlim
+target "base-slim" {
+  context = "."
+  dockerfile = "Dockerfile"
+  target = "final"
+  platforms = ["linux/amd64"]
+  tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-slim"]
+  output = ["type=docker"]
+}
+
+# Slim SDXL target for creating optimized SDXL images
+target "sdxl-slim" {
+  context = "."
+  dockerfile = "Dockerfile"
+  target = "final"
+  platforms = ["linux/amd64"]
+  args = {
+    MODEL_TYPE = "sdxl"
+  }
+  tags = ["${DOCKERHUB_REPO}/${DOCKERHUB_IMG}:${RELEASE_VERSION}-sdxl-slim"]
+  output = ["type=docker"]
 }
 
 

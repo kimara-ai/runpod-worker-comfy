@@ -1,6 +1,6 @@
 services:
   comfyui-worker:
-    image: local/runpod-worker-comfy:dev-sdxl  # Your locally built image
+    image: kimaraai/runpod-worker-comfy:latest-sdxl-slim  # Slim SDXL image
     deploy:
       resources:
         reservations:

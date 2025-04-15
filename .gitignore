@@ -8,3 +8,4 @@ __pycache__
 test_data/output/*
 test_data/volume/*
 downloaded_images_sync/*
+slim.report.json
