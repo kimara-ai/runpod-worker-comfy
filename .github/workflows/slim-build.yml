@@ -2,6 +2,9 @@ name: Slim Image Build
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - '*'
 
 jobs:
   build-slim:
@@ -47,7 +50,9 @@ jobs:
           echo "DOCKERHUB_REPO=${{ vars.DOCKERHUB_REPO }}" >> $GITHUB_ENV
           echo "DOCKERHUB_IMG=${{ vars.DOCKERHUB_IMG }}" >> $GITHUB_ENV
           echo "HUGGINGFACE_ACCESS_TOKEN=${{ secrets.HUGGINGFACE_ACCESS_TOKEN }}" >> $GITHUB_ENV
-          echo "RELEASE_VERSION=${GITHUB_REF##refs/heads/}" | sed 's/\//-/g' >> $GITHUB_ENV
+          # Get the latest release tag for versioning
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          echo "RELEASE_VERSION=${LATEST_TAG}" >> $GITHUB_ENV
 
       - name: Build base image
         uses: docker/bake-action@v2
