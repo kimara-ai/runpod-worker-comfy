@@ -75,8 +75,8 @@ def check_server(url, retries=500, delay=50):
 
     Args:
     - url (str): The URL to check
-    - retries (int, optional): The number of times to attempt connecting to the server. Default is 50
-    - delay (int, optional): The time in milliseconds to wait between retries. Default is 500
+    - retries (int, optional): The number of times to attempt connecting to the server. Default is 500
+    - delay (int, optional): The time in milliseconds to wait between retries. Default is 50
 
     Returns:
     bool: True if the server is reachable within the given number of retries, otherwise False
@@ -88,7 +88,7 @@ def check_server(url, retries=500, delay=50):
 
             # If the response status code is 200, the server is up and running
             if response.status_code == 200:
-                print(f"runpod-worker-comfy - API is reachable")
+                print(f"runpod-worker-comfy - API is reachable after {i+1} attempts")
                 return True
         except requests.RequestException as e:
             # If an exception occurs, the server may not be ready
