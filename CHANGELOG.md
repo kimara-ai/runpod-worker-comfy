@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.4...1.1.0) (2025-04-15)
+
+
+### Features
+
+* improve perf, do small refactors, force new semver release ([6265d58](https://github.com/kimara-ai/runpod-worker-comfy/commit/6265d58205d02ca4a21dcd5c88022bad5504a4ef))
+
 ## [1.0.4](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.3...1.0.4) (2025-04-14)
 
 
