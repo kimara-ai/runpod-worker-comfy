@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.1...1.1.2) (2025-04-15)
+
+
+### Bug Fixes
+
+* build slim image in release workflow ([df818fe](https://github.com/kimara-ai/runpod-worker-comfy/commit/df818fe445eb7e5160a441e58fa4c1ef1966a044))
+
 ## [1.1.1](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.0...1.1.1) (2025-04-15)
 
 
