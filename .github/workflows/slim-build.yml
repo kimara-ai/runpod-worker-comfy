@@ -2,9 +2,6 @@ name: Slim Image Build
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - '*'
 
 jobs:
   build-slim:
