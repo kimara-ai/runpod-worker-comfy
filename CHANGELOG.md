@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.0...1.1.1) (2025-04-15)
+
+
+### Bug Fixes
+
+* semver release for slim image ([00e77d4](https://github.com/kimara-ai/runpod-worker-comfy/commit/00e77d4b0339b191cdb35dc0b3682e99ed6daf3f))
+
 # [1.1.0](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.0.4...1.1.0) (2025-04-15)
 
 
