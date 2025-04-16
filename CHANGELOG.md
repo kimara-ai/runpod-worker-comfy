@@ -1,3 +1,10 @@
+## [1.1.5](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.4...1.1.5) (2025-04-16)
+
+
+### Bug Fixes
+
+* correctly tag slim image with version ([188aa46](https://github.com/kimara-ai/runpod-worker-comfy/commit/188aa46047b6d328007eb0fcb4dc90bfa451a4ff))
+
 ## [1.1.4](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.3...1.1.4) (2025-04-16)
 
 
