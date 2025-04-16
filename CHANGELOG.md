@@ -1,3 +1,10 @@
+## [1.1.4](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.3...1.1.4) (2025-04-16)
+
+
+### Bug Fixes
+
+* remove unreliable slim build report ([a745ad7](https://github.com/kimara-ai/runpod-worker-comfy/commit/a745ad75659e946738f898664ad1b14461a14f00))
+
 ## [1.1.3](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.2...1.1.3) (2025-04-16)
 
 
