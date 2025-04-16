@@ -1,3 +1,15 @@
+# [1.2.0](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.4...1.2.0) (2025-04-16)
+
+
+### Bug Fixes
+
+* correct Docker slim image tagging to enable version-based deployment ([8a34dae](https://github.com/kimara-ai/runpod-worker-comfy/commit/8a34daeb2051ebd1cdbe5b3aed009b562306a32d))
+
+
+### Features
+
+* add conventional commits enforcement ([fc5e976](https://github.com/kimara-ai/runpod-worker-comfy/commit/fc5e976b83225b5b9907ff24dea22850c3ee0d75))
+
 ## [1.1.5](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.4...1.1.5) (2025-04-16)
 
 
