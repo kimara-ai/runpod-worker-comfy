@@ -114,9 +114,12 @@ jobs:
           DSLIM_SHOW_CLOGS: true
         with:
           target: ${{ env.DOCKERHUB_REPO }}/${{ env.DOCKERHUB_IMG }}:${{ env.RELEASE_VERSION }}-base
-          tag: "slim"
+          tag: "${{ env.RELEASE_VERSION }}-slim"
 
       - name: Push slim image to Docker Hub
         if: steps.semanticrelease.outputs.new-release-published == 'true'
         run: |
+          # Show available images for debugging
+          docker images
+          # Push the slim image
           docker push ${{ env.DOCKERHUB_REPO }}/${{ env.DOCKERHUB_IMG }}:${{ env.RELEASE_VERSION }}-slim
