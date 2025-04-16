@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.2...1.1.3) (2025-04-16)
+
+
+### Bug Fixes
+
+* use already built base image for slimming ([58ad902](https://github.com/kimara-ai/runpod-worker-comfy/commit/58ad9025ea3e08b26a50f8114fca93d961f1452e))
+
 ## [1.1.2](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.1...1.1.2) (2025-04-15)
 
 
