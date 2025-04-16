@@ -116,12 +116,6 @@ jobs:
           target: ${{ env.DOCKERHUB_REPO }}/${{ env.DOCKERHUB_IMG }}:${{ env.RELEASE_VERSION }}-base
           tag: "slim"
 
-      - name: Show slim build report
-        if: steps.semanticrelease.outputs.new-release-published == 'true'
-        run: |
-          echo "Slim build report:"
-          echo "${{ steps.slim.outputs.report }}"
-          
       - name: Push slim image to Docker Hub
         if: steps.semanticrelease.outputs.new-release-published == 'true'
         run: |
