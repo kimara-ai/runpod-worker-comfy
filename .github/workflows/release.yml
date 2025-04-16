@@ -91,19 +91,11 @@ jobs:
           readme-filepath: ./README.md
           enable-url-completion: true
           
-      # Build and push slim image as part of the release process
-      - name: Build base image for slimming
+      # Pull the base image that was already pushed
+      - name: Pull base image for slimming
         if: steps.semanticrelease.outputs.new-release-published == 'true'
-        uses: docker/bake-action@v2
-        with:
-          push: false
-          load: true
-          set: |
-            *.args.DOCKERHUB_REPO=${{ env.DOCKERHUB_REPO }}
-            *.args.DOCKERHUB_IMG=${{ env.DOCKERHUB_IMG }}
-            *.args.RELEASE_VERSION=${{ env.RELEASE_VERSION }}
-            *.args.HUGGINGFACE_ACCESS_TOKEN=${{ env.HUGGINGFACE_ACCESS_TOKEN }}
-          targets: base
+        run: |
+          docker pull ${{ env.DOCKERHUB_REPO }}/${{ env.DOCKERHUB_IMG }}:${{ env.RELEASE_VERSION }}-base
 
       - name: Run DockerSlim to optimize image
         if: steps.semanticrelease.outputs.new-release-published == 'true'
