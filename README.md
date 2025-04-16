@@ -14,6 +14,8 @@
 
 <!-- toc -->
 
+> **Note for Contributors:** This project follows [Conventional Commits](docs/COMMIT_CONVENTION.md) for automatic semantic versioning.
+
 - [Quickstart](#quickstart)
 - [Features](#features)
 - [Configuration](#configuration)
