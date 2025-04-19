@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.2.0...1.2.1) (2025-04-19)
+
+
+### Bug Fixes
+
+* add pip installs ([c82a9aa](https://github.com/kimara-ai/runpod-worker-comfy/commit/c82a9aa68fc9ca395594d98b5068c241bbd507ba))
+
 # [1.2.0](https://github.com/kimara-ai/runpod-worker-comfy/compare/1.1.4...1.2.0) (2025-04-16)
 
 

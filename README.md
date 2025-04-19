@@ -14,8 +14,6 @@
 
 <!-- toc -->
 
-> **Note for Contributors:** This project follows [Conventional Commits](docs/COMMIT_CONVENTION.md) for automatic semantic versioning.
-
 - [Quickstart](#quickstart)
 - [Features](#features)
 - [Configuration](#configuration)
@@ -49,7 +47,7 @@
 
 ## Quickstart
 
-- 🐳 Deploy with this image: `kimaraai/runpod-worker-comfy:1.2.0-base`
+- 🐳 Deploy with this image: `kimaraai/runpod-worker-comfy:1.2.1-base`
 - 🔧 [Set up your RunPod endpoint](#use-the-docker-image-on-runpod)
 - 🧪 Run an [example workflow](./test_resources/workflows/)
 
@@ -62,7 +60,7 @@
   - AWS S3 upload ([with configuration](#upload-image-to-aws-s3))
   - Azure Blob Storage ([with configuration](#upload-image-to-azure-blob-storage))
 - Available images:
-  - `kimaraai/runpod-worker-comfy:1.2.0-base`: Clean ComfyUI without models
+  - `kimaraai/runpod-worker-comfy:1.2.1-base`: Clean ComfyUI without models
 - Build custom images with models:
   - SDXL: Use `--build-arg MODEL_TYPE=sdxl` 
     - Includes: [sd_xl_base_1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0), [sdxl_vae](https://huggingface.co/stabilityai/sdxl-vae/) and [sdxl-vae-fp16-fix](https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/)
@@ -125,7 +123,7 @@ Example response:
 - Configure:
   - Name: `runpod-worker-comfy` (or any name)
   - Type: serverless
-  - Image: `kimaraai/runpod-worker-comfy:1.2.0-base`
+  - Image: `kimaraai/runpod-worker-comfy:1.2.1-base`
   - Disk: `20 GB`
   - Optional: Set [S3](#aws-s3-storage) or [Azure](#azure-blob-storage) environment variables
 - Click `Save Template`
