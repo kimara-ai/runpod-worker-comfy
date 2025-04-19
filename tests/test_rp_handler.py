@@ -20,6 +20,11 @@ sys.modules['azure.storage.blob.BlobServiceClient'] = MagicMock()
 sys.modules['azure.storage.blob.BlobClient'] = MagicMock()
 sys.modules['azure.storage.blob.ContainerClient'] = MagicMock()
 
+# Mock log collector before importing rp_handler
+sys.modules['log_collector'] = MagicMock()
+sys.modules['log_collector.LogCollector'] = MagicMock()
+sys.modules['log_collector.LogLevel'] = MagicMock()
+
 # Save references to the real functions before importing rp_handler
 from src import rp_handler
 
@@ -42,10 +47,21 @@ class TestRunpodWorkerComfy(unittest.TestCase):
         # Create a no-op function for os.path.exists
         self._real_os_path_exists = os.path.exists
         os.path.exists = MagicMock(return_value=True)
+        
+        # Setup mock LogCollector
+        self.mock_log_collector = MagicMock()
+        self.mock_log_collector.get_logs_formatted.return_value = "Mock logs output"
+        
+        # Patch LogCollector class
+        self.log_collector_patcher = patch('src.rp_handler.LogCollector', return_value=self.mock_log_collector)
+        self.mock_log_collector_class = self.log_collector_patcher.start()
 
     def tearDown(self):
         # Restore the original os.path.exists
         os.path.exists = self._real_os_path_exists
+        
+        # Stop LogCollector patcher
+        self.log_collector_patcher.stop()
 
     def test_valid_input_with_workflow_only(self):
         input_data = {"workflow": {"key": "value"}}
@@ -355,6 +371,56 @@ class TestRunpodWorkerComfy(unittest.TestCase):
             self.assertEqual(result["message"][0]["imageType"], "base64")
             self.assertEqual(result["message"][0]["image"], "base64_encoded_image_data")
             rp_handler.base64_encode.assert_called_once_with(f"{RUNPOD_WORKER_COMFY_TEST_RESOURCES_IMAGES}/test/ComfyUI_00001_.png")
+    
+    def test_handler_with_invalid_input(self):
+        # Test that the handler includes logs when input validation fails
+        with patch.object(rp_handler, 'validate_input', return_value=(None, "Invalid input error")):
+            result = rp_handler.handler({"id": "test-job", "input": {}})
+            
+            self.assertIn("error", result)
+            self.assertEqual(result["error"], "Invalid input error")
+            self.assertIn("logs", result)
+            self.assertEqual(result["logs"], "Mock logs output")
+            
+            # Verify log collector was used
+            self.mock_log_collector.error.assert_called_with("InputValidation", "Invalid input error")
+    
+    def test_handler_with_workflow_error(self):
+        # Test that the handler includes logs when workflow queuing fails
+        with patch.object(rp_handler, 'validate_input', return_value=({"workflow": {}, "images": None}, None)), \
+             patch.object(rp_handler, 'check_server', return_value=True), \
+             patch.object(rp_handler, 'upload_images', return_value={"status": "success"}), \
+             patch.object(rp_handler, 'queue_workflow', side_effect=Exception("Workflow error")):
+            
+            result = rp_handler.handler({"id": "test-job", "input": {}})
+            
+            self.assertIn("error", result)
+            self.assertEqual(result["error"], "Error queuing workflow: Workflow error")
+            self.assertIn("logs", result)
+            self.assertEqual(result["logs"], "Mock logs output")
+            
+            # Verify log collector was used for error
+            self.mock_log_collector.error.assert_called()
+    
+    def test_handler_with_success_no_logs(self):
+        # Test that the handler does NOT include logs when successful
+        process_output_mock = MagicMock(return_value={"status": "success", "message": []})
+        
+        with patch.object(rp_handler, 'validate_input', return_value=({"workflow": {}, "images": None}, None)), \
+             patch.object(rp_handler, 'check_server', return_value=True), \
+             patch.object(rp_handler, 'upload_images', return_value={"status": "success"}), \
+             patch.object(rp_handler, 'queue_workflow', return_value={"prompt_id": "test-prompt"}), \
+             patch.object(rp_handler, 'get_history', return_value={"test-prompt": {"outputs": {}}}), \
+             patch.object(rp_handler, 'process_output_images', new=process_output_mock):
+            
+            result = rp_handler.handler({"id": "test-job", "input": {}})
+            
+            # Verify status and result doesn't contain logs
+            self.assertEqual(result.get("status"), "success")
+            self.assertNotIn("logs", result)
+            
+            # Verify log collector was used for info messages
+            self.mock_log_collector.info.assert_called()
 
     def test_upload_to_azure_blob(self):
         # Skip the Azure Blob test since the mocks are not working correctly

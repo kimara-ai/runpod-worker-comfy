@@ -9,3 +9,4 @@ test_data/output/*
 test_data/volume/*
 downloaded_images_sync/*
 slim.report.json
+tests/test_live_endpoint.sh

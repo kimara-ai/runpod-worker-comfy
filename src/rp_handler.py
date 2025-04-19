@@ -11,6 +11,7 @@ import uuid
 from io import BytesIO
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from azure.identity import DefaultAzureCredential
+from log_collector import LogCollector, LogLevel
 
 # Time to wait between API check attempts in milliseconds
 COMFY_API_AVAILABLE_INTERVAL_MS = 50
@@ -69,7 +70,7 @@ def validate_input(job_input):
     return {"workflow": workflow, "images": images}, None
 
 
-def check_server(url, retries=500, delay=50):
+def check_server(url, retries=500, delay=50, log_collector=None):
     """
     Check if a server is reachable via HTTP GET request
 
@@ -77,50 +78,70 @@ def check_server(url, retries=500, delay=50):
     - url (str): The URL to check
     - retries (int, optional): The number of times to attempt connecting to the server. Default is 500
     - delay (int, optional): The time in milliseconds to wait between retries. Default is 50
+    - log_collector (LogCollector, optional): Log collector instance for logging
 
     Returns:
     bool: True if the server is reachable within the given number of retries, otherwise False
     """
-
+    component = "ComfyAPI"
+    
+    if log_collector:
+        log_collector.info(component, f"Checking if server is reachable at {url}")
+    
     for i in range(retries):
         try:
             response = requests.get(url)
 
             # If the response status code is 200, the server is up and running
             if response.status_code == 200:
-                print(f"runpod-worker-comfy - API is reachable after {i+1} attempts")
+                message = f"API is reachable after {i+1} attempts"
+                if log_collector:
+                    log_collector.info(component, message)
+                else:
+                    print(f"runpod-worker-comfy - {message}")
                 return True
         except requests.RequestException as e:
             # If an exception occurs, the server may not be ready
+            if i % 10 == 0 and log_collector:  # Log only every 10th attempt to avoid spam
+                log_collector.debug(component, f"API not ready yet (attempt {i+1}): {str(e)}")
             pass
 
         # Wait for the specified delay before retrying
         time.sleep(delay / 1000)
 
-    print(
-        f"runpod-worker-comfy - Failed to connect to server at {url} after {retries} attempts."
-    )
+    message = f"Failed to connect to server at {url} after {retries} attempts."
+    if log_collector:
+        log_collector.error(component, message)
+    else:
+        print(f"runpod-worker-comfy - {message}")
     return False
 
 
-def upload_images(images):
+def upload_images(images, log_collector=None):
     """
     Upload a list of base64 encoded images to the ComfyUI server using the /upload/image endpoint.
 
     Args:
         images (list): A list of dictionaries, each containing the 'name' of the image and the 'image' as a base64 encoded string.
-        server_address (str): The address of the ComfyUI server.
+        log_collector (LogCollector, optional): Log collector instance for logging
 
     Returns:
-        list: A list of responses from the server for each image upload.
+        dict: Dictionary with upload status, message, and details
     """
+    component = "ImageUpload"
+    
     if not images:
+        if log_collector:
+            log_collector.info(component, "No images to upload")
         return {"status": "success", "message": "No images to upload", "details": []}
 
     responses = []
     upload_errors = []
 
-    print(f"runpod-worker-comfy - image(s) upload")
+    if log_collector:
+        log_collector.info(component, f"Starting upload of {len(images)} image(s)")
+    else:
+        print(f"runpod-worker-comfy - image(s) upload")
 
     for image in images:
         name = image["name"]
@@ -133,22 +154,48 @@ def upload_images(images):
             "overwrite": (None, "true"),
         }
 
-        # POST request to upload the image
-        response = requests.post(f"http://{COMFY_HOST}/upload/image", files=files)
-        if response.status_code != 200:
-            upload_errors.append(f"Error uploading {name}: {response.text}")
-        else:
-            responses.append(f"Successfully uploaded {name}")
+        try:
+            # POST request to upload the image
+            if log_collector:
+                log_collector.debug(component, f"Uploading image: {name}")
+                
+            response = requests.post(f"http://{COMFY_HOST}/upload/image", files=files)
+            
+            if response.status_code != 200:
+                error_msg = f"Error uploading {name}: {response.text}"
+                upload_errors.append(error_msg)
+                if log_collector:
+                    log_collector.error(component, error_msg)
+            else:
+                success_msg = f"Successfully uploaded {name}"
+                responses.append(success_msg)
+                if log_collector:
+                    log_collector.info(component, success_msg)
+        except Exception as e:
+            error_msg = f"Exception uploading {name}: {str(e)}"
+            upload_errors.append(error_msg)
+            if log_collector:
+                log_collector.error(component, error_msg, e)
+            else:
+                print(f"runpod-worker-comfy - ERROR: {error_msg}")
 
     if upload_errors:
-        print(f"runpod-worker-comfy - image(s) upload with errors")
+        if log_collector:
+            log_collector.warning(component, f"Image(s) upload completed with {len(upload_errors)} errors")
+        else:
+            print(f"runpod-worker-comfy - image(s) upload with errors")
+            
         return {
             "status": "error",
             "message": "Some images failed to upload",
             "details": upload_errors,
         }
 
-    print(f"runpod-worker-comfy - image(s) upload complete")
+    if log_collector:
+        log_collector.info(component, "All image(s) uploaded successfully")
+    else:
+        print(f"runpod-worker-comfy - image(s) upload complete")
+        
     return {
         "status": "success",
         "message": "All images uploaded successfully",
@@ -156,36 +203,74 @@ def upload_images(images):
     }
 
 
-def queue_workflow(workflow):
+def queue_workflow(workflow, log_collector=None):
     """
     Queue a workflow to be processed by ComfyUI
 
     Args:
         workflow (dict): A dictionary containing the workflow to be processed
+        log_collector (LogCollector, optional): Log collector instance for logging
 
     Returns:
         dict: The JSON response from ComfyUI after processing the workflow
     """
+    component = "WorkflowQueue"
+    
+    if log_collector:
+        log_collector.info(component, "Queueing workflow for processing")
+        
+    try:
+        # The top level element "prompt" is required by ComfyUI
+        data = json.dumps({"prompt": workflow}).encode("utf-8")
 
-    # The top level element "prompt" is required by ComfyUI
-    data = json.dumps({"prompt": workflow}).encode("utf-8")
+        if log_collector:
+            log_collector.debug(component, "Sending workflow to ComfyUI API")
+            
+        req = urllib.request.Request(f"http://{COMFY_HOST}/prompt", data=data)
+        response_data = urllib.request.urlopen(req).read()
+        response = json.loads(response_data)
+        
+        if log_collector:
+            log_collector.info(component, f"Workflow queued successfully with prompt_id: {response.get('prompt_id')}")
+            
+        return response
+    except Exception as e:
+        if log_collector:
+            log_collector.error(component, f"Error queueing workflow: {str(e)}", e)
+        raise
 
-    req = urllib.request.Request(f"http://{COMFY_HOST}/prompt", data=data)
-    return json.loads(urllib.request.urlopen(req).read())
 
-
-def get_history(prompt_id):
+def get_history(prompt_id, log_collector=None):
     """
     Retrieve the history of a given prompt using its ID
 
     Args:
         prompt_id (str): The ID of the prompt whose history is to be retrieved
+        log_collector (LogCollector, optional): Log collector instance for logging
 
     Returns:
         dict: The history of the prompt, containing all the processing steps and results
     """
-    with urllib.request.urlopen(f"http://{COMFY_HOST}/history/{prompt_id}") as response:
-        return json.loads(response.read())
+    component = "HistoryFetch"
+    
+    try:
+        if log_collector:
+            log_collector.debug(component, f"Fetching history for prompt_id: {prompt_id}")
+            
+        with urllib.request.urlopen(f"http://{COMFY_HOST}/history/{prompt_id}") as response:
+            history = json.loads(response.read())
+            
+            if log_collector:
+                if prompt_id in history and history[prompt_id].get("outputs"):
+                    log_collector.debug(component, f"Found outputs in history for prompt_id: {prompt_id}")
+                else:
+                    log_collector.debug(component, f"No outputs yet in history for prompt_id: {prompt_id}")
+                    
+            return history
+    except Exception as e:
+        if log_collector:
+            log_collector.error(component, f"Error fetching history for prompt_id {prompt_id}: {str(e)}", e)
+        raise
 
 
 def base64_encode(img_path):
@@ -249,7 +334,7 @@ def upload_to_azure_blob(job_id, local_image_path):
         # Return None to indicate failure
         return None
 
-def process_output_images(outputs, job_id):
+def process_output_images(outputs, job_id, log_collector=None):
     """
     This function takes the "outputs" from image generation and the job ID,
     then determines the correct way to return the images, either as direct URLs
@@ -260,6 +345,7 @@ def process_output_images(outputs, job_id):
         outputs (dict): A dictionary containing the outputs from image generation,
                         typically includes node IDs and their respective output data.
         job_id (str): The unique identifier for the job.
+        log_collector (LogCollector, optional): Log collector instance for logging
 
     Returns:
         dict: A dictionary with the status ('success' or 'error') and the message,
@@ -278,6 +364,7 @@ def process_output_images(outputs, job_id):
     - If any image file does not exist in the output folder, it adds an error for that specific image.
     - Returns a list of all processed images with their node_id and image data.
     """
+    component = "ImageProcessor"
 
     # The path where ComfyUI stores the generated images
     COMFY_OUTPUT_PATH = os.environ.get("COMFY_OUTPUT_PATH", "/comfyui/output")
@@ -286,17 +373,27 @@ def process_output_images(outputs, job_id):
     image_results = []
     errors = []
 
-    print(f"runpod-worker-comfy - image generation is done")
+    if log_collector:
+        log_collector.info(component, "Image generation completed, processing output images")
+        log_collector.debug(component, f"ComfyUI output path: {COMFY_OUTPUT_PATH}")
+    else:
+        print(f"runpod-worker-comfy - image generation is done")
 
     # Process each node and its images
     for node_id, node_output in outputs.items():
         if "images" in node_output:
+            if log_collector:
+                log_collector.debug(component, f"Processing images from node: {node_id}")
+                
             for image in node_output["images"]:
                 # Construct the image path
                 image_path = os.path.join(image["subfolder"], image["filename"])
                 local_image_path = f"{COMFY_OUTPUT_PATH}/{image_path}"
                 
-                print(f"runpod-worker-comfy - processing: {local_image_path}")
+                if log_collector:
+                    log_collector.debug(component, f"Processing image: {local_image_path}")
+                else:
+                    print(f"runpod-worker-comfy - processing: {local_image_path}")
                 
                 # Check if the image file exists
                 if os.path.exists(local_image_path):
@@ -304,47 +401,98 @@ def process_output_images(outputs, job_id):
                     # Possible values: "azure", "s3", "base64" (default)
                     image_return_method = os.environ.get("IMAGE_RETURN_METHOD", "base64").lower()
                     
-                    if image_return_method == "azure" and os.environ.get("AZURE_STORAGE_CONNECTION_STRING"):
-                        # Upload to Azure Blob Storage
-                        image_data = upload_to_azure_blob(job_id, local_image_path)
-                        if image_data:
-                            image_type = "url"
-                            print(f"runpod-worker-comfy - image from node {node_id} uploaded to Azure Blob Storage")
-                        else:
-                            # Fallback if Azure upload fails
-                            if os.environ.get("BUCKET_ENDPOINT_URL", False):
-                                image_data = rp_upload.upload_image(job_id, local_image_path)
+                    if log_collector:
+                        log_collector.debug(component, f"Using image return method: {image_return_method}")
+                        
+                    try:
+                        if image_return_method == "azure" and os.environ.get("AZURE_STORAGE_CONNECTION_STRING"):
+                            # Upload to Azure Blob Storage
+                            if log_collector:
+                                log_collector.debug(component, "Attempting to upload to Azure Blob Storage")
+                                
+                            image_data = upload_to_azure_blob(job_id, local_image_path)
+                            if image_data:
                                 image_type = "url"
-                                print(f"runpod-worker-comfy - Azure upload failed, image from node {node_id} falling back to AWS S3")
+                                if log_collector:
+                                    log_collector.info(component, f"Image from node {node_id} uploaded to Azure Blob Storage")
+                                else:
+                                    print(f"runpod-worker-comfy - image from node {node_id} uploaded to Azure Blob Storage")
                             else:
-                                image_data = base64_encode(local_image_path)
-                                image_type = "base64"
-                                print(f"runpod-worker-comfy - Azure upload failed, image from node {node_id} falling back to base64")
-                    elif image_return_method == "s3" and os.environ.get("BUCKET_ENDPOINT_URL", False):
-                        # Upload to AWS S3
-                        image_data = rp_upload.upload_image(job_id, local_image_path)
-                        image_type = "url"
-                        print(f"runpod-worker-comfy - image from node {node_id} uploaded to AWS S3")
-                    elif image_return_method in ["azure", "s3"]:
-                        # User requested cloud storage but it's not configured, fall back to base64
-                        image_data = base64_encode(local_image_path)
-                        image_type = "base64"
-                        print(f"runpod-worker-comfy - {image_return_method} was requested but not configured, image from node {node_id} falling back to base64")
-                    else:
-                        # Use base64 (default)
-                        image_data = base64_encode(local_image_path)
-                        image_type = "base64"
-                        print(f"runpod-worker-comfy - image from node {node_id} converted to base64")
-                    
-                    # Add this image to our results
-                    image_results.append({
-                        "node_id": node_id,
-                        "imageType": image_type,
-                        "image": image_data
-                    })
+                                # Fallback if Azure upload fails
+                                if log_collector:
+                                    log_collector.warning(component, "Azure upload failed, attempting fallback")
+                                    
+                                if os.environ.get("BUCKET_ENDPOINT_URL", False):
+                                    image_data = rp_upload.upload_image(job_id, local_image_path)
+                                    image_type = "url"
+                                    if log_collector:
+                                        log_collector.info(component, f"Fallback: Image from node {node_id} uploaded to AWS S3")
+                                    else:
+                                        print(f"runpod-worker-comfy - Azure upload failed, image from node {node_id} falling back to AWS S3")
+                                else:
+                                    image_data = base64_encode(local_image_path)
+                                    image_type = "base64"
+                                    if log_collector:
+                                        log_collector.info(component, f"Fallback: Image from node {node_id} converted to base64")
+                                    else:
+                                        print(f"runpod-worker-comfy - Azure upload failed, image from node {node_id} falling back to base64")
+                        elif image_return_method == "s3" and os.environ.get("BUCKET_ENDPOINT_URL", False):
+                            # Upload to AWS S3
+                            if log_collector:
+                                log_collector.debug(component, "Attempting to upload to AWS S3")
+                                
+                            image_data = rp_upload.upload_image(job_id, local_image_path)
+                            image_type = "url"
+                            if log_collector:
+                                log_collector.info(component, f"Image from node {node_id} uploaded to AWS S3")
+                            else:
+                                print(f"runpod-worker-comfy - image from node {node_id} uploaded to AWS S3")
+                        elif image_return_method in ["azure", "s3"]:
+                            # User requested cloud storage but it's not configured, fall back to base64
+                            if log_collector:
+                                log_collector.warning(component, f"{image_return_method} was requested but not configured, falling back to base64")
+                                
+                            image_data = base64_encode(local_image_path)
+                            image_type = "base64"
+                            if log_collector:
+                                log_collector.info(component, f"Image from node {node_id} converted to base64")
+                            else:
+                                print(f"runpod-worker-comfy - {image_return_method} was requested but not configured, image from node {node_id} falling back to base64")
+                        else:
+                            # Use base64 (default)
+                            if log_collector:
+                                log_collector.debug(component, "Using base64 for image data")
+                                
+                            image_data = base64_encode(local_image_path)
+                            image_type = "base64"
+                            if log_collector:
+                                log_collector.info(component, f"Image from node {node_id} converted to base64")
+                            else:
+                                print(f"runpod-worker-comfy - image from node {node_id} converted to base64")
+                        
+                        # Add this image to our results
+                        image_results.append({
+                            "node_id": node_id,
+                            "imageType": image_type,
+                            "image": image_data
+                        })
+                    except Exception as e:
+                        error_msg = f"Error processing image from node {node_id}: {str(e)}"
+                        errors.append({
+                            "node_id": node_id,
+                            "error": error_msg
+                        })
+                        if log_collector:
+                            log_collector.error(component, error_msg, e)
+                        else:
+                            print(f"runpod-worker-comfy - ERROR: {error_msg}")
                 else:
                     error_msg = f"Image does not exist in the specified output folder: {local_image_path}"
-                    print(f"runpod-worker-comfy - {error_msg}")
+                    if log_collector:
+                        log_collector.error(component, error_msg)
+                    else:
+                        print(f"runpod-worker-comfy - {error_msg}")
+                        
                     errors.append({
                         "node_id": node_id,
                         "error": error_msg
@@ -352,15 +500,22 @@ def process_output_images(outputs, job_id):
 
     # Return the results
     if image_results:
+        if log_collector:
+            log_collector.info(component, f"Successfully processed {len(image_results)} images with {len(errors)} errors")
+            
         return {
             "status": "success",
             "message": image_results,  # Keep the "message" field for backward compatibility
             "errors": errors if errors else []
         }
     else:
+        error_msg = "No images were successfully generated or found"
+        if log_collector:
+            log_collector.error(component, error_msg)
+            
         return {
             "status": "error",
-            "message": "No images were successfully generated or found",
+            "message": error_msg,
             "errors": errors
         }
 
@@ -380,64 +535,105 @@ def handler(job):
               that contains a list of generated images. Each image is represented as a dictionary with 
               node_id, imageType, and image data (either URL or base64).
     """
-    job_input = job["input"]
-
-    # Make sure that the input is valid
-    validated_data, error_message = validate_input(job_input)
-    if error_message:
-        return {"error": error_message}
-
-    # Extract validated data
-    workflow = validated_data["workflow"]
-    images = validated_data.get("images")
-
-    # Make sure that the ComfyUI API is available
-    check_server(
-        f"http://{COMFY_HOST}",
-        COMFY_API_AVAILABLE_MAX_RETRIES,
-        COMFY_API_AVAILABLE_INTERVAL_MS,
-    )
-
-    # Upload images if they exist
-    upload_result = upload_images(images)
-
-    if upload_result["status"] == "error":
-        return upload_result
-
-    # Queue the workflow
+    # Initialize log collector for job
+    log_collector = LogCollector(job_id=job.get("id"))
+    
+    # Try to start ComfyUI log capture, but don't fail if it doesn't work
+    # Start log capture for this job only
     try:
-        queued_workflow = queue_workflow(workflow)
-        prompt_id = queued_workflow["prompt_id"]
-        print(f"runpod-worker-comfy - queued workflow with ID {prompt_id}")
-    except Exception as e:
-        return {"error": f"Error queuing workflow: {str(e)}"}
-
-    # Poll for completion
-    print(f"runpod-worker-comfy - wait until image generation is complete")
-    retries = 0
+        log_collector.start_comfy_log_capture()
+    except:
+        pass
+    
     try:
-        while retries < COMFY_POLLING_MAX_RETRIES:
-            history = get_history(prompt_id)
+        job_input = job["input"]
 
-            # Exit the loop if we have found the history
-            if prompt_id in history and history[prompt_id].get("outputs"):
-                break
+        # Make sure that the input is valid
+        validated_data, error_message = validate_input(job_input)
+        if error_message:
+            log_collector.error("InputValidation", error_message)
+            return {"error": error_message, "logs": log_collector.get_logs_formatted()}
+
+        # Extract validated data
+        workflow = validated_data["workflow"]
+        images = validated_data.get("images")
+
+        # Make sure that the ComfyUI API is available
+        api_available = check_server(
+            f"http://{COMFY_HOST}",
+            COMFY_API_AVAILABLE_MAX_RETRIES,
+            COMFY_API_AVAILABLE_INTERVAL_MS,
+            log_collector
+        )
+        
+        if not api_available:
+            error_message = "ComfyUI API is not available"
+            log_collector.error("Handler", error_message)
+            return {"error": error_message, "logs": log_collector.get_logs_formatted()}
+
+        # Upload images if they exist
+        upload_result = upload_images(images, log_collector)
+
+        if upload_result["status"] == "error":
+            # Add logs to error response
+            upload_result["logs"] = log_collector.get_logs_formatted()
+            return upload_result
+
+        # Queue the workflow
+        try:
+            queued_workflow = queue_workflow(workflow, log_collector)
+            prompt_id = queued_workflow["prompt_id"]
+            log_collector.info("Handler", f"Queued workflow with ID {prompt_id}")
+        except Exception as e:
+            log_collector.error("Handler", f"Error queuing workflow: {str(e)}", e)
+            return {"error": f"Error queuing workflow: {str(e)}", "logs": log_collector.get_logs_formatted()}
+
+        # Poll for completion
+        log_collector.info("Handler", "Waiting for image generation to complete")
+        retries = 0
+        try:
+            while retries < COMFY_POLLING_MAX_RETRIES:
+                history = get_history(prompt_id, log_collector)
+
+                # Exit the loop if we have found the history
+                if prompt_id in history and history[prompt_id].get("outputs"):
+                    log_collector.info("Handler", "Image generation completed")
+                    break
+                else:
+                    # Wait before trying again
+                    time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
+                    retries += 1
             else:
-                # Wait before trying again
-                time.sleep(COMFY_POLLING_INTERVAL_MS / 1000)
-                retries += 1
-        else:
-            return {"error": "Max retries reached while waiting for image generation"}
+                error_message = "Max retries reached while waiting for image generation"
+                log_collector.error("Handler", error_message)
+                return {"error": error_message, "logs": log_collector.get_logs_formatted()}
+        except Exception as e:
+            log_collector.error("Handler", f"Error waiting for image generation: {str(e)}", e)
+            return {"error": f"Error waiting for image generation: {str(e)}", "logs": log_collector.get_logs_formatted()}
+
+        # Get the generated images and return them as URLs in an AWS bucket or as base64
+        images_result = process_output_images(history[prompt_id].get("outputs"), job["id"], log_collector)
+
+        # Add refresh_worker flag to the result
+        result = {**images_result, "refresh_worker": REFRESH_WORKER}
+        
+        # Only add logs if there was an error
+        if result.get("status") == "error":
+            result["logs"] = log_collector.get_logs_formatted()
+        
+        return result
+    
     except Exception as e:
-        return {"error": f"Error waiting for image generation: {str(e)}"}
-
-    # Get the generated images and return them as URLs in an AWS bucket or as base64
-    images_result = process_output_images(history[prompt_id].get("outputs"), job["id"])
-
-    # Add refresh_worker flag to the result
-    result = {**images_result, "refresh_worker": REFRESH_WORKER}
-
-    return result
+        # For any unhandled exception, return error with logs
+        log_collector.error("Handler", f"Unhandled exception during job processing: {str(e)}", e)
+        return {"error": f"Unhandled exception: {str(e)}", "logs": log_collector.get_logs_formatted()}
+    
+    finally:
+        # Always stop log capture to clean up resources
+        try:
+            log_collector.stop_comfy_log_capture()
+        except:
+            pass
 
 
 # Start the handler only if this script is run directly
