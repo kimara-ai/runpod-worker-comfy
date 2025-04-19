@@ -40,14 +40,14 @@ RUN pip install --no-cache-dir comfy-cli
 RUN /usr/bin/yes | comfy --workspace /comfyui install --cuda-version 12.4 --nvidia --version 0.3.27
 
 # Install optimized PyTorch with CUDA 12.4 support
-RUN pip install --no-cache-dir --force-reinstall torch torchvision torchaudio xformers --extra-index-url https://download.pytorch.org/whl/cu124
+RUN pip install --no-cache-dir --force-reinstall torch torchvision torchaudio xformers inference --extra-index-url https://download.pytorch.org/whl/cu124
 
 # Change working directory to ComfyUI
 WORKDIR /comfyui
 
 # Install all dependencies with optimized builds
 RUN pip install --no-cache-dir runpod requests azure-storage-blob azure-identity huggingface_hub \
-    numpy pillow scipy transformers safetensors aiohttp accelerate pyyaml
+    numpy pillow scipy transformers safetensors aiohttp accelerate pyyaml dill
 
 # Support for the network volume
 ADD src/extra_model_paths.yaml ./

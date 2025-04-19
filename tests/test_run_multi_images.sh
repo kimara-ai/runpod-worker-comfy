@@ -119,15 +119,15 @@ if [ ! -z "$IMAGES_OUTPUT" ]; then
         mkdir -p "$DOWNLOAD_DIR"
         
         # Download each image URL
-        echo -e "\n${YELLOW}Downloading images to $DOWNLOAD_DIR...${NC}"
-        URL_COUNT=0
-        echo "$AZURE_URLS" | while read -r url; do
-            URL_COUNT=$((URL_COUNT + 1))
-            OUTPUT_FILE="$DOWNLOAD_DIR/image_${URL_COUNT}.png"
-            echo "Downloading: $url"
-            curl -s -o "$OUTPUT_FILE" "$url"
-            echo "Saved to: $OUTPUT_FILE"
-        done
+        #echo -e "\n${YELLOW}Downloading images to $DOWNLOAD_DIR...${NC}"
+        #URL_COUNT=0
+        #echo "$AZURE_URLS" | while read -r url; do
+        #    URL_COUNT=$((URL_COUNT + 1))
+        #    OUTPUT_FILE="$DOWNLOAD_DIR/image_${URL_COUNT}.png"
+        #    echo "Downloading: $url"
+        #    curl -s -o "$OUTPUT_FILE" "$url"
+        #    echo "Saved to: $OUTPUT_FILE"
+        #done
     else
         # For base64 encoded images
         BASE64_IMAGES=$(echo "$RESPONSE" | jq -r '.output.message[] | select(.imageType=="base64") | .image' 2>/dev/null)
